@@ -90,8 +90,8 @@ async def manejar_error_validacion(
     "[object Object]" porque no sabe colapsarlo a string.
 
     Aquí:
-      1. Logueamos cada error de validación con loc + msg (visible en consola
-         del FastAPI para diagnosticar qué campo del body falla).
+      1. Registramos ubicación y tipo del error sin input, ctx ni mensajes
+         de validadores que puedan incluir datos sensibles.
       2. Devolvemos una respuesta con `detail` ya colapsado a string legible,
          compatible con el resto de errores HTTP del backend.
     """
@@ -107,9 +107,13 @@ async def manejar_error_validacion(
     detalle = " | ".join(partes) or "Cuerpo de petición inválido."
 
     log.warning(
-        "Validación 422 en %s %s -> %s",
-        request.method, request.url.path, detalle,
-        extra={"request_id": _request_id(request), "errores_pydantic": errores},
+        "Validación 422 en %s %s",
+        request.method, request.url.path,
+        # input, ctx y mensajes de validadores pueden contener credenciales.
+        extra={
+            "request_id": _request_id(request),
+            "errores_pydantic": [{"loc": err.get("loc", ()), "type": err.get("type", "unknown")} for err in errores],
+        },
     )
 
     return JSONResponse(

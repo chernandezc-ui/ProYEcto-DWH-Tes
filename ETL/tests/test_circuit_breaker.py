@@ -7,6 +7,9 @@ Tests del módulo centralizado utils/circuit_breaker.py.
 import os
 import sys
 import unittest
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -16,6 +19,18 @@ from utils.circuit_breaker import (
     lanzar_si_bloqueado,
 )
 from utils.errores import ErrorCircuitBreakerCritico, ErrorCircuitBreakerError
+
+
+def _procesador(total=100, rechazados=10, insertados=90):
+    from silver.facts import _base_processor as bp
+
+    with patch.object(bp, "obtener_parametros_pipeline", return_value={}), patch.object(bp, "obtener_reglas_validacion", return_value={}):
+        processor = bp.BaseFactProcessor(None, 'Bronce.Test', 'Silver.Test')
+    processor.resumen.update(
+        leidos=total, insertados=insertados,
+        rechazados_ids=[{'id': i} for i in range(rechazados)],
+    )
+    return processor
 
 
 class TestEvaluacionUmbrales(unittest.TestCase):
@@ -100,22 +115,10 @@ class TestBreakerNoDestructivo(unittest.TestCase):
         # No debe haber lanzado nada al llegar aqui.
 
     def test_payload_keys_contrato_pipeline(self):
-        # Simula lo que finalizar_proceso debe poner en su return dict
-        # para que pipeline._ejecutar_fact pueda decidir lanzar.
-        r = evaluar(total_leidos=100, rechazados=10, tabla='X')
-        payload = {
-            'insertados': 90,
-            'breaker_nivel': r.nivel,
-            'breaker_mensaje': r.mensaje,
-            'breaker_resultado': r,
-            'breaker_porcentaje': r.porcentaje_rechazo,
-        }
-        # El pipeline debe poder detectar el nivel y disponer del objeto.
+        payload = _procesador().finalizar_proceso(MagicMock())
         self.assertEqual(payload['breaker_nivel'], 'CRITICO')
-        self.assertIsNotNone(payload['breaker_resultado'])
-        # Y al pasarle el objeto a lanzar_si_bloqueado, ahora si lanza.
-        with self.assertRaises(ErrorCircuitBreakerCritico):
-            lanzar_si_bloqueado(payload['breaker_resultado'])
+        self.assertEqual(payload['breaker_porcentaje'], 10.0)
+        self.assertIsNotNone(payload['breaker_mensaje'])
 
 
 class TestBasePayloadIncluyeBreaker(unittest.TestCase):
@@ -123,42 +126,132 @@ class TestBasePayloadIncluyeBreaker(unittest.TestCase):
     Y NO lanza excepciones del breaker dentro de la transaccion (Bug 2)."""
 
     def test_finalizar_proceso_devuelve_breaker_keys(self):
-        # Verificacion ligera: el codigo fuente declara las keys.
-        import inspect
-        from silver.facts import _base_processor as bp
-        src = inspect.getsource(bp.BaseFactProcessor.finalizar_proceso)
-        for key in (
-            "'breaker_nivel'",
-            "'breaker_mensaje'",
-        ):
-            self.assertIn(key, src, f'finalizar_proceso debe exponer {key} (Bug 2 fix).')
+        payload = _procesador().finalizar_proceso(MagicMock())
+        for key in ('breaker_nivel', 'breaker_mensaje', 'breaker_total_leidos', 'breaker_rechazados'):
+            self.assertIn(key, payload)
 
     def test_finalizar_proceso_no_levanta_error_breaker_inline(self):
-        # NO debe haber lineas activas con `raise ErrorCircuitBreaker...`
-        # dentro de finalizar_proceso (Bug 2: la transaccion no debe romperse).
-        import inspect
-        from silver.facts import _base_processor as bp
-        src = inspect.getsource(bp.BaseFactProcessor.finalizar_proceso)
-        lineas_activas_raise = [
-            ln for ln in src.splitlines()
-            if 'raise ErrorCircuitBreaker' in ln and not ln.lstrip().startswith('#')
-        ]
-        self.assertEqual(
-            lineas_activas_raise, [],
-            f'finalizar_proceso NO debe levantar ErrorCircuitBreaker* dentro de '
-            f'la transaccion (Bug 2). Lineas activas: {lineas_activas_raise}',
-        )
+        processor = _procesador()
+        processor.ids_procesados = [1]
+        processor.ids_rechazados = [2]
+        processor.resumen['cuarentena'] = [{'id': 2}]
+        context = MagicMock()
+        payload = processor.finalizar_proceso(context)
+        self.assertEqual(payload['breaker_nivel'], 'CRITICO')
+        self.assertEqual(context.marcar_estado_carga.call_count, 2)
+        context.enviar_cuarentena.assert_called_once_with('Bronce.Test', [{'id': 2}])
+        context.commit.assert_not_called()
+        context.rollback.assert_not_called()
 
     def test_finalizar_proceso_excluye_duplicados_internos(self):
-        # Bug 3 fix: duplicados intra-batch (DUPLICADO_INTERNO) no deben
-        # contar como rechazos DQ en el circuit breaker.
-        import inspect
-        from silver.facts import _base_processor as bp
-        src = inspect.getsource(bp.BaseFactProcessor.finalizar_proceso)
-        self.assertIn(
-            'es_duplicado_interno', src,
-            'finalizar_proceso debe excluir duplicados internos del circuit breaker (Bug 3 fix).',
-        )
+        processor = _procesador(rechazados=0)
+        processor.resumen['rechazados_ids'] = [
+            {'id': 1}, {'id': 1},
+            {'id': 2, 'es_duplicado_interno': True},
+            {'id': 3, 'es_duplicado_externo': True},
+        ]
+        payload = processor.finalizar_proceso(MagicMock())
+        self.assertEqual(payload['breaker_rechazados'], 1)
+        self.assertEqual(payload['breaker_porcentaje'], 1.0)
+        self.assertEqual(payload['breaker_nivel'], 'WARNING')
+
+
+@pytest.mark.parametrize('total,rejected,expected', [
+    (0, 0, None), (49, 49, None), (50, 0, None),
+    (100, 1, 'WARNING'), (100, 2, 'ERROR'), (100, 5, 'CRITICO'),
+])
+def test_procesador_real_respeta_limites_y_muestra(total, rejected, expected):
+    payload = _procesador(total, rejected).finalizar_proceso(MagicMock())
+    assert payload['breaker_nivel'] == expected
+    assert payload['breaker_total_leidos'] == total
+    assert payload['breaker_rechazados'] == rejected
+    assert payload['Bloqueo_Integridad'] == (expected == 'WARNING')
+    if expected is None:
+        assert payload['breaker_mensaje'] is None
+
+
+@pytest.mark.parametrize('module,class_name,expected', [
+    ('fact_censo_plantas', 'ProcesadorCensoPlantas', 'WARNING'),
+    ('fact_evaluacion_pesos', 'ProcesadorEvaluacionPesos', 'WARNING'),
+    ('fact_telemetria_clima', 'ProcesadorTelemetriaClima', 'WARNING'),
+    ('fact_areas_plantas', 'ProcesadorAreasPlantas', 'WARNING'),
+    ('fact_induccion_floral', 'ProcesadorInduccionFloral', 'CRITICO'),
+    ('fact_evaluacion_vegetativa', 'ProcesadorEvaluacionVegetativa', 'CRITICO'),
+])
+def test_umbrales_de_subclases_reales_se_conservan(module, class_name, expected):
+    import importlib
+    from silver.facts import _base_processor as bp
+
+    cls = getattr(importlib.import_module(f'silver.facts.{module}'), class_name)
+    with patch.object(bp, 'obtener_parametros_pipeline', return_value={}), patch.object(bp, 'obtener_reglas_validacion', return_value={}):
+        processor = cls(None, columna_id='ID_Test') if module == 'fact_induccion_floral' else cls(None)
+    processor.resumen.update(leidos=100, insertados=0, rechazados_ids=[{'id': i} for i in range(100)])
+    payload = processor.finalizar_proceso(MagicMock())
+    assert payload['breaker_nivel'] == expected
+
+
+@pytest.mark.parametrize('total,inserted,rejected,expected', [(49, 0, 0, False), (50, 0, 0, True), (100, 1, 0, False), (100, 0, 1, False)])
+def test_deteccion_de_perdida_silenciosa_no_cambia(total, inserted, rejected, expected):
+    payload = _procesador(total, rejected, inserted).finalizar_proceso(MagicMock())
+    assert payload['posible_perdida_silenciosa'] is expected
+
+
+def test_produccion_delega_en_el_evaluador_canonico():
+    from utils import circuit_breaker
+
+    processor = _procesador()
+    with patch.object(circuit_breaker, 'evaluar', wraps=circuit_breaker.evaluar) as evaluation:
+        payload = processor.finalizar_proceso(MagicMock())
+    evaluation.assert_called_once_with(
+        100, 10, umbrales=UmbralesCircuitBreaker(), tabla='Silver.Test',
+    )
+    assert payload['breaker_nivel'] == 'CRITICO'
+
+
+@pytest.mark.parametrize('rejected,exception', [(2, ErrorCircuitBreakerError), (5, ErrorCircuitBreakerCritico)])
+@pytest.mark.parametrize('rebuild', [False, True])
+def test_evaluacion_real_conserva_commit_incremental_y_rollback_reproceso(tmp_path, monkeypatch, rejected, exception, rebuild):
+    from sqlalchemy import create_engine, text
+    import pipeline
+    from utils.metricas import normalizar_resultado_fact
+    from utils.reproceso_atomico import reconstruir_fact_atomica
+
+    engine = create_engine('sqlite:///' + str(tmp_path / 'breaker.db'))
+    try:
+        with engine.begin() as connection:
+            connection.execute(text('CREATE TABLE fact (value INTEGER)'))
+            connection.execute(text('INSERT INTO fact VALUES (7)'))
+
+        def load(scoped):
+            with scoped.begin() as connection:
+                connection.execute(text('INSERT INTO fact VALUES (9)'))
+                payload = _procesador(100, rejected, 1).finalizar_proceso(MagicMock())
+            return normalizar_resultado_fact(payload)
+
+        def prepare(scoped):
+            with scoped.begin() as connection:
+                count = connection.execute(text('DELETE FROM fact')).rowcount
+            return {'filas_destino_eliminadas': count}
+
+        if rebuild:
+            with pytest.raises(exception):
+                reconstruir_fact_atomica(engine, prepare, load)
+        else:
+            monkeypatch.setattr(pipeline, 'registrar_inicio', MagicMock(return_value=1))
+            monkeypatch.setattr(pipeline, 'registrar_fin', MagicMock())
+            monkeypatch.setattr(pipeline, '_imprimir', MagicMock())
+            summary = {}
+            if exception is ErrorCircuitBreakerCritico:
+                with pytest.raises(exception):
+                    pipeline._ejecutar_fact('Test', 'Silver.Test', load, engine, summary)
+            else:
+                assert pipeline._ejecutar_fact('Test', 'Silver.Test', load, engine, summary)
+            assert 'Test CIRCUIT_BREAKER' in summary
+
+        with engine.connect() as connection:
+            assert connection.execute(text('SELECT value FROM fact ORDER BY value')).scalars().all() == ([7] if rebuild else [7, 9])
+    finally:
+        engine.dispose()
 
 
 if __name__ == '__main__':

@@ -13,10 +13,10 @@ Estos tests garantizan que la PK SIEMPRE se exponga también como
 'ID_Registro_Origen' tras leer Bronce.
 """
 
-import os
 import unittest
 
 import pandas as pd
+import pytest
 
 from silver.facts._helpers_fact_comunes import asegurar_id_registro_origen
 
@@ -58,30 +58,18 @@ class TestAsegurarIdRegistroOrigen(unittest.TestCase):
         self.assertNotIn('ID_Registro_Origen', df.columns)
 
 
-@unittest.skipUnless(
-    os.getenv('ACP_TEST_DB') == '1',
-    'Smoke test contra BD real: exportar ACP_TEST_DB=1 para ejecutarlo.',
-)
-class TestLeerBronceExponeIdRegistroOrigen(unittest.TestCase):
-    """
-    Smoke test end-to-end (saltable): lee una tabla Bronce chica y verifica que
-    leer_bronce_dinamico exponga ID_Registro_Origen no-nulo igual a la PK.
-    """
+@pytest.mark.sqlserver
+def test_peladas_expone_id_registro_origen(sqlserver_engine):
+    """Smoke SQL explícito: comprobar el espejo de PK leyendo una tabla Bronce."""
+    from silver.facts._helpers_fact_comunes import leer_bronce_dinamico
 
-    def test_peladas_expone_id_registro_origen(self):
-        from config.conexion import obtener_engine
-        from silver.facts._helpers_fact_comunes import leer_bronce_dinamico
-
-        engine = obtener_engine()
-        df = leer_bronce_dinamico(
-            engine, 'Bronce.Peladas', 'ID_Peladas', ['Fecha_Raw'], filtro_estado=False
-        )
-        self.assertIn('ID_Registro_Origen', df.columns)
-        if len(df):
-            self.assertEqual(
-                df['ID_Registro_Origen'].tolist(), df['ID_Peladas'].tolist()
-            )
-            self.assertFalse(df['ID_Registro_Origen'].isnull().any())
+    df = leer_bronce_dinamico(
+        sqlserver_engine, 'Bronce.Peladas', 'ID_Peladas', ['Fecha_Raw'], filtro_estado=False
+    )
+    assert 'ID_Registro_Origen' in df.columns
+    if len(df):
+        assert df['ID_Registro_Origen'].tolist() == df['ID_Peladas'].tolist()
+        assert not df['ID_Registro_Origen'].isnull().any()
 
 
 if __name__ == '__main__':

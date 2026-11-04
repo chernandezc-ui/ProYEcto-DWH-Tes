@@ -3,32 +3,21 @@ backend/tests/conftest.py
 =========================
 Fixtures globales de pytest para el backend.
 
-Conexión: reusa `obtener_engine()` del módulo principal — no hay DB
-efímera, los tests leen contra la BD de dev. Por eso TODOS los tests
-deben ser de SOLO LECTURA o usar `db_rollback` para envolver mutaciones
-en una transacción que se revierte al final.
+Conexión: usa la instancia aislada validada por el conftest raíz.
+Las pruebas SQL requieren --run-sqlserver y un destino explícito.
 """
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import pytest
-
-# Permitir importar `repositorios`, `servicios`, `api` sin instalar el
-# backend como paquete. Mismo truco que `scripts/medir_catalogos.py`.
-_DIR_BACKEND = Path(__file__).resolve().parents[1]
-if str(_DIR_BACKEND) not in sys.path:
-    sys.path.insert(0, str(_DIR_BACKEND))
-
-from nucleo.conexion import obtener_engine  # noqa: E402
 
 
 @pytest.fixture(scope="session")
-def engine():
-    """Engine compartido por toda la suite — evita reconectar por test."""
-    return obtener_engine()
+def engine(sqlserver_engine):
+    """Engine del destino de prueba validado, nunca la BD de desarrollo."""
+    if sqlserver_engine is None:
+        pytest.skip("La fixture engine requiere integración SQL Server habilitada")
+    return sqlserver_engine
 
 
 @pytest.fixture

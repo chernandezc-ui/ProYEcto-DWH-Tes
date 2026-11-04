@@ -22,6 +22,9 @@ El sistema está dividido en tres componentes principales que trabajan en cadena
 
 ## Guía de Inicio Rápido
 
+Para ejecutar las pruebas locales sin SQL Server y habilitar integración solo
+con un destino aislado, consulta la [guía de pruebas](docs/pruebas-locales.md).
+
 Para levantar el ecosistema completo en tu entorno local de forma rápida, puedes utilizar los scripts automatizados ubicados en la raíz del proyecto.
 
 ### Requisitos Previos

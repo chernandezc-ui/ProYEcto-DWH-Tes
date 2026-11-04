@@ -14,7 +14,7 @@ Cobertura:
   - Filtro combinado (texto + sector).
   - Normalización: strings vacíos se tratan como None (filtro desactivado).
 
-Estos tests son de SOLO LECTURA contra la BD de dev. No mutan datos.
+Estos tests son de SOLO LECTURA contra una BD de prueba aislada. No mutan datos.
 """
 
 from __future__ import annotations
@@ -22,6 +22,8 @@ from __future__ import annotations
 import pytest
 
 from repositorios.repo_catalogos import listar_geografia
+
+pytestmark = pytest.mark.sqlserver
 
 
 # ──────────────────────────────────────────────────────────────────────────

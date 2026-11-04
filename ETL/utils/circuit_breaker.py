@@ -3,14 +3,10 @@ circuit_breaker.py
 ==================
 Lógica centralizada del circuit breaker de calidad para los Facts.
 
-Antes: thresholds (`LIMITE_WARNING`, `LIMITE_ERROR`, `LIMITE_CRITICO`) duplicados
-en cada subclase de BaseFactProcessor + lógica de evaluación duplicada en
-_base_processor.py. Refactor: thresholds en `UMBRALES_*` (por dominio) +
-función pura `evaluar()` con contrato único.
-
-Mantiene retro-compatibilidad: las subclases que sobrescriben `LIMITE_*`
-siguen funcionando porque `BaseFactProcessor.evaluar_circuit_breaker()` usa
-los atributos de instancia.
+BaseFactProcessor.finalizar_proceso delega en evaluar() pasando los LIMITE_*
+de cada instancia; las subclases conservan sus umbrales por dominio.
+La evaluación es pura. El orquestador incremental lanza después del commit;
+la reconstrucción atómica decide el rollback antes del commit externo.
 """
 from __future__ import annotations
 

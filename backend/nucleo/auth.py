@@ -142,7 +142,7 @@ def decodificar_token(token: str) -> dict:
 # ── Modelo de usuario autenticado ──────────────────────────────────────────────
 
 class UsuarioActual:
-    """Representa el usuario autenticado extraído del JWT."""
+    """Identidad autenticada y permisos vigentes del usuario."""
 
     __slots__ = ("nombre_usuario", "rol", "nombre_display")
 
@@ -179,7 +179,7 @@ async def obtener_usuario_actual(
     token: Annotated[str, Depends(_SCHEME)],
 ) -> UsuarioActual:
     """
-    Dependencia FastAPI: extrae y valida el usuario desde el Bearer token.
+    Dependencia FastAPI: valida el JWT y toma identidad/rol vigentes de BD.
     Inyectable en cualquier endpoint con: usuario: Annotated[UsuarioActual, Depends(obtener_usuario_actual)]
     """
     payload = decodificar_token(token)
@@ -192,7 +192,11 @@ async def obtener_usuario_actual(
             detail="Sesión revocada o usuario inactivo.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return UsuarioActual.desde_payload(payload)
+    return UsuarioActual(
+        nombre_usuario=usuario_db["nombre_usuario"],
+        rol=usuario_db["rol"],
+        nombre_display=usuario_db["nombre_display"],
+    )
 
 
 def require_rol(*roles: str):
