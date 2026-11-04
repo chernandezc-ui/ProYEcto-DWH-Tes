@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "diagram_type": "tree",
+  "meta": {
+    "title": "ACP: decisiones de refactor propuestas",
+    "locale": "es",
+    "output": ".archify/architecture-acp-audit-20261103-204308/refactor-propuesto.html",
+    "quality_profile": "showcase"
+  },
+  "layout": {
+    "direction": "right"
+  },
+  "nodes": [
+    {
+      "id": "objetivo",
+      "label": "Refactor ACP",
+      "sublabel": "Propuesta; no ejecutada"
+    },
+    {
+      "id": "contrato",
+      "label": "P0 · Contrato SQL",
+      "sublabel": "Baseline reproducible",
+      "parent": "objetivo"
+    },
+    {
+      "id": "baseline",
+      "label": "Esquema instalable",
+      "parent": "contrato"
+    },
+    {
+      "id": "lineage",
+      "label": "IDs y granularidad",
+      "parent": "contrato"
+    },
+    {
+      "id": "negocio",
+      "label": "P1 · Reglas completas",
+      "sublabel": "Integrar antes de borrar",
+      "parent": "objetivo"
+    },
+    {
+      "id": "matrix",
+      "label": "Matriz y cutoff",
+      "parent": "negocio"
+    },
+    {
+      "id": "mdm",
+      "label": "Modo estricto y corrección",
+      "parent": "negocio"
+    },
+    {
+      "id": "operacion",
+      "label": "P1 · Operación fiable",
+      "sublabel": "Estado durable",
+      "parent": "objetivo"
+    },
+    {
+      "id": "events",
+      "label": "Eventos por fact",
+      "parent": "operacion"
+    },
+    {
+      "id": "publish",
+      "label": "Publicación de versión",
+      "parent": "operacion"
+    },
+    {
+      "id": "estructura",
+      "label": "P2 · Modularidad",
+      "sublabel": "Separar responsabilidades",
+      "parent": "objetivo"
+    },
+    {
+      "id": "etlmod",
+      "label": "Layouts / validación / SQL",
+      "parent": "estructura"
+    },
+    {
+      "id": "apiunit",
+      "label": "Servicios / repositorios / UoW",
+      "parent": "estructura"
+    },
+    {
+      "id": "limpieza",
+      "label": "P2 · Limpieza dirigida",
+      "sublabel": "Con evidencia de uso",
+      "parent": "objetivo"
+    },
+    {
+      "id": "retire",
+      "label": "Retirar privados huérfanos",
+      "parent": "limpieza"
+    },
+    {
+      "id": "connect",
+      "label": "Conectar capacidades útiles",
+      "parent": "limpieza"
+    },
+    {
+      "id": "evidencia",
+      "label": "P1 · Pruebas útiles",
+      "sublabel": "Evitar falsos verdes",
+      "parent": "objetivo"
+    },
+    {
+      "id": "realtest",
+      "label": "Implementación real + SQL",
+      "parent": "evidencia"
+    },
+    {
+      "id": "contracts",
+      "label": "15 facts + API + fallos",
+      "parent": "evidencia"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "Interpretación",
+      "items": [
+        "Las líneas muestran pertenencia a un paquete de trabajo, no llamadas en producción.",
+        "Cada rama tiene evidencia, prioridad, pruebas de aceptación y orden de implementación en el informe."
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Qué se conserva",
+      "items": [
+        "FastAPI, SQL Server, arquitectura por capas, runner separado y contratos agrícolas.",
+        "No se propone una reescritura completa ni introducir microservicios."
+      ]
+    }
+  ]
+}

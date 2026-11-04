@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "5b90f01a-4983-4ec8-99a1-1556632394ab",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "D:\\DataWareHouse-main\\.archify\\architecture-acp-audit-20261103-204308\\candidate.json",
+  "output": "D:\\DataWareHouse-main\\.archify\\architecture-acp-audit-20261103-204308\\arquitectura-actual.html",
+  "specification": {
+    "sha256": "da6f93c22d9aa99953b4eb4d665bb1a4ce53cbe9b11e5ee849a1b7f267213945",
+    "bytes": 4656
+  },
+  "artifact": {
+    "sha256": "874f9464e67c75d58c9fe9401722b41cb3dedf49eacb949d7ecd31a25b9dc564",
+    "bytes": 825007
+  }
+}

@@ -1,0 +1,211 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "ACP actual: control, servicio y ejecución",
+    "locale": "es",
+    "output": ".archify/architecture-acp-audit-20261103-204308/arquitectura-actual.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "operador",
+      "type": "external",
+      "label": "Usuario / cliente API",
+      "sublabel": "Frontend aún ausente",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        190,
+        76
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "Backend FastAPI",
+      "sublabel": "JWT, servicios y SQL",
+      "pos": [
+        300,
+        40
+      ],
+      "size": [
+        190,
+        76
+      ]
+    },
+    {
+      "id": "dwh",
+      "type": "database",
+      "label": "Datos agrícolas",
+      "sublabel": "Bronce / Silver / Gold",
+      "pos": [
+        1100,
+        40
+      ],
+      "size": [
+        190,
+        76
+      ]
+    },
+    {
+      "id": "cache",
+      "type": "database",
+      "label": "Caché SQLite",
+      "sublabel": "TTL por consulta",
+      "pos": [
+        40,
+        240
+      ],
+      "size": [
+        190,
+        76
+      ]
+    },
+    {
+      "id": "control",
+      "type": "database",
+      "label": "Control SQL",
+      "sublabel": "Cola, eventos y lock",
+      "pos": [
+        560,
+        240
+      ],
+      "size": [
+        190,
+        76
+      ]
+    },
+    {
+      "id": "runner",
+      "type": "backend",
+      "label": "Runner separado",
+      "sublabel": "Sondeo y heartbeat",
+      "pos": [
+        820,
+        240
+      ],
+      "size": [
+        190,
+        76
+      ]
+    },
+    {
+      "id": "archivos",
+      "type": "external",
+      "label": "Excel de campo",
+      "sublabel": "Entrada y archivado",
+      "pos": [
+        820,
+        440
+      ],
+      "size": [
+        190,
+        76
+      ]
+    },
+    {
+      "id": "pipeline",
+      "type": "backend",
+      "label": "Pipeline ETL",
+      "sublabel": "Dimensiones y 15 facts",
+      "pos": [
+        1100,
+        440
+      ],
+      "size": [
+        190,
+        76
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "cliente-api",
+      "from": "operador",
+      "to": "api",
+      "label": "HTTP + JWT",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-datos",
+      "from": "api",
+      "to": "dwh",
+      "label": "SQL",
+      "variant": "default"
+    },
+    {
+      "id": "api-cache",
+      "from": "api",
+      "to": "cache",
+      "label": "TTL",
+      "variant": "default"
+    },
+    {
+      "id": "api-control",
+      "from": "api",
+      "to": "control",
+      "label": "encola / consulta",
+      "variant": "default"
+    },
+    {
+      "id": "runner-control",
+      "from": "runner",
+      "to": "control",
+      "label": "poll SQL",
+      "variant": "default"
+    },
+    {
+      "id": "runner-etl",
+      "from": "runner",
+      "to": "pipeline",
+      "label": "subproceso",
+      "variant": "dashed"
+    },
+    {
+      "id": "excel-etl",
+      "from": "archivos",
+      "to": "pipeline",
+      "label": "Excel",
+      "variant": "emphasis"
+    },
+    {
+      "id": "etl-dwh",
+      "from": "pipeline",
+      "to": "dwh",
+      "label": "SQL por lote",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Lectura del mapa",
+      "items": [
+        "Mapa de la copia local inspeccionada; no existe revisión Git verificable en este checkout.",
+        "Control y los esquemas agrícolas pertenecen al mismo SQL Server: son responsabilidades lógicas, no servidores aislados.",
+        "El backend consulta Silver y Gold; proyecciones también escribe en Silver."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Entradas y propietarios",
+      "items": [
+        "backend/main.py registra rutas y autorización.",
+        "backend/runner/runner.py y ejecutor.py consumen Control y lanzan el ETL.",
+        "ETL/pipeline.py orquesta archivos, dimensiones, facts y comprobaciones Gold."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Deuda que afecta al frontend",
+      "items": [
+        "El SSE consulta eventos persistidos en Control; el runner interpreta stdout.",
+        "Blinker solo comunica dentro del mismo proceso; no es un bus entre API y runner.",
+        "Gold contiene vistas: bloquear su comprobación final no crea una versión publicada."
+      ]
+    }
+  ]
+}

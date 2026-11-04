@@ -1,0 +1,652 @@
+{
+  "project": "ACP DataWarehouse Proyecciones",
+  "architecture": "Medallion (Bronce → Silver → Gold)",
+  "generated": "2026-06-03",
+  "tables": {
+    "Bronce.Calibres": {
+      "desc": "Raw blueberry caliber sizes from field evaluations. Stores diameter measurements by module, variety and evaluator with full audit trail.",
+      "source": "Excel: /data/entrada/calibres/ → Cargador manual → Normalizacion de columnas",
+      "grain": "One row per caliber evaluation event (by module+turno+variedad+fecha)",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Raw", "Modulo_Raw", "Turno_Raw", "Variedad_Raw", "Evaluador_Raw"],
+      "purpose": "Field quality control measure for fruit consistency & harvest planning"
+    },
+    "Bronce.Censo_Plantas": {
+      "desc": "Plant population count by plot and variety state (healthy/regular/bad/dead). Wide or long format detection with automatic pivoting from state columns.",
+      "source": "Excel: /data/entrada/censo_plantas/ → Smart layout detection (state columns) → Melt to long format",
+      "grain": "One row per (fecha, modulo, turno, valvula, variedad, estado_planta)",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Raw", "Modulo_Raw", "Turno_Raw", "Valvula_Raw", "Variedad_Raw", "Estado_Planta_Raw", "Cantidad_Raw"],
+      "purpose": "Plant health monitoring for field loss tracking, replant planning & phytosanitary record"
+    },
+    "Bronce.Ciclos_Fenologicos": {
+      "desc": "Phenological stage tracking by organ color (buds/flowers/small fruit/mature). Marks development progress of fruit clusters with ribbon color coding.",
+      "source": "Excel: /data/entrada/ciclos_fenologicos/ → Normalizacion organo+color+etapa",
+      "grain": "One row per (fecha, modulo, turno, valvula, organo, color) observation",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Raw", "Modulo_Raw", "Turno_Raw", "Valvula_Raw", "Organo_Raw", "Color_Raw", "Variedad_Raw"],
+      "purpose": "Fruit ripeness tracking & harvest timing optimization via color bands & phenology markers"
+    },
+    "Bronce.Cierre_Mapas_Cosecha": {
+      "desc": "Harvest field mapping closure summary by module and variety. Final validation that all harvest blocks are complete and recorded.",
+      "source": "Excel: /data/entrada/cierre_mapas_cosecha/ → Field closure records",
+      "grain": "One row per (fecha, modulo, variedad) harvest block closure",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Raw", "Modulo_Raw", "Variedad_Raw"],
+      "purpose": "Harvest completion tracking & data integrity verification before season closeout"
+    },
+    "Bronce.Consolidado_Tareos": {
+      "desc": "Labor time tracking consolidated from field rosters (tareos). Hours worked by person, activity, labor type via SAP integration.",
+      "source": "SAP export: /data/entrada/tareos/ → Consolidacion de actividades+labores+horas",
+      "grain": "One row per (fecha, dni_responsable, modulo, turno, actividad, labor) time record",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Raw", "IDPersonalGeneral_Raw", "DNIResponsable_Raw", "Modulo_Raw", "Turno_Raw", "Actividad_Raw", "Labor_Raw", "HorasTrabajadas_Raw"],
+      "purpose": "Labor cost allocation, productivity KPIs, and operational benchmarking by activity"
+    },
+    "Bronce.Conteo_Fruta": {
+      "desc": "Fruit phenology count by developmental stage (buttons/flowers/small/mature/crema/harvest-ready). Core field count with 20+ metrics per point.",
+      "source": "Excel: /data/entrada/conteo_fruta/ → Multi-sheet reader (BD+Hoja1 or report header in row 2)",
+      "grain": "One row per (fecha, modulo, turno, valvula, punto, variedad) fruit stage count",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Raw", "Modulo_Raw", "Turno_Raw", "Valvula_Raw", "Punto_Raw", "Variedad_Raw", "BotonesFlorales_Raw", "Flores_Raw", "BayasPequenas_Raw", "BayasGrandes_Raw", "BayasCremas_Raw", "BayasMaduras_Raw", "BayasCosechables_Raw", "PlantasProductivas_Raw", "PlantasNoProductivas_Raw", "Muestras_Raw"],
+      "purpose": "Harvest forecasting via fruit stage progression modeling & weekly supply projection"
+    },
+    "Bronce.Cosecha_SAP": {
+      "desc": "Harvest reconciliation from SAP with actual field pickings. Kg_Total, Area, plant count, and SAP-mapped semana_cosecha for alignment.",
+      "source": "SAP data export: /data/entrada/data_sap/ → SAP harvest extract with geography + weights",
+      "grain": "One row per (fecha, semana, modulo, turno, valvula, variedad) SAP harvest record",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Campana_Raw", "Fecha_Raw", "Semana_Raw", "Modulo_Raw", "Turno_Raw", "Valvula_Raw", "Variedad_Raw", "Kg_Total_Raw", "Area_Raw", "Plantas_Raw", "Semana_Cosecha_Raw"],
+      "purpose": "Harvest volume truth-set for projection comparison, yield analytics, and SAP reconciliation"
+    },
+    "Bronce.Data_SAP": {
+      "desc": "SAP warehouse & logistics data including material codes, clients, storage, weights (gross/tare/net), shipment docs. Links harvest to post-harvest chain.",
+      "source": "SAP extract: /data/entrada/data_sap/ → Warehouse receiving & despatch records",
+      "grain": "One row per shipment record (fecha_cosecha, consumidor, variedad, lote, almacen, documento_remision)",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Cosecha_Raw", "Consumidor_PEP_Raw", "Variedad_Raw", "Material_Codigo_Raw", "Peso_Bruto_Raw", "Peso_Neto_Raw", "Cantidad_Jabas_Raw"],
+      "purpose": "Post-harvest quality tracking, client-level supply chain visibility, and fruit traceability"
+    },
+    "Bronce.Evaluacion_Calidad_Poda": {
+      "desc": "Pruning quality assessment by cuts, shoot diameter, basal shoot count, and defective cuts. Post-pruning harvest evaluation.",
+      "source": "Excel: /data/entrada/evaluacion_calidad_poda/ → Pruning metrics by plot element",
+      "grain": "One row per (fecha, modulo, turno, valvula, variedad, tipo_evaluacion) poda quality check",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Raw", "Modulo_Raw", "Turno_Raw", "Valvula_Raw", "Variedad_Raw", "Tipo_Evaluacion_Raw", "TallosPlanta_Raw", "DiametroTallo_Raw", "CortesDefectuosos_Raw", "AlturaPoda_Raw"],
+      "purpose": "Pruning execution QA and shoot quality standardization for consistent future cropping"
+    },
+    "Bronce.Evaluacion_Pesos": {
+      "desc": "Berry weight samples by stage (small/large/creams/mature/harvest-ready). Key for yield prediction via weight trajectory modeling.",
+      "source": "Excel: /data/entrada/evaluacion_pesos/ → Multi-format weight sampling (peso baya + muestra)",
+      "grain": "One row per (fecha, modulo, turno, valvula, variedad, tipo_evaluacion) weight sample",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Raw", "Modulo_Raw", "Turno_Raw", "Valvula_Raw", "Variedad_Raw", "BayasPequenas_Raw", "PesoBayasPequenas_Raw", "Cosechables_Raw", "PesoCosechables_Raw"],
+      "purpose": "Yield projection via weight curve analysis; per-berry kg estimation from sample data"
+    },
+    "Bronce.Evaluacion_Vegetativa": {
+      "desc": "Plant vegetative vigor by floor (piso 1-5) measuring: shoot count, productives, diameter, basal shoots, height. Comprehensive structure assessment.",
+      "source": "Excel: /data/entrada/evaluacion_vegetativa/ OR /floracion/ → Layout signature: N_Plantas_en_Floracion_Raw + Semanas_Poda_Raw",
+      "grain": "One row per (fecha, modulo, turno, valvula, cama, variedad, semanas_poda) vegetative assessment",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Raw", "Modulo_Raw", "Turno_Raw", "Valvula_Raw", "Cama_Raw", "Variedad_Raw", "Semanas_Poda_Raw", "Piso1_Brotes_Raw", "Piso1_Productivos_Raw", "Piso1_Diametro_Raw", "Piso2_Brotes_Raw", "...Piso5_Diametro_Raw"],
+      "purpose": "Plant structure tracking for disease prediction, pollination potential, & harvest readiness forecast"
+    },
+    "Bronce.Fiscalizacion": {
+      "desc": "Compliance & field inspection records by inspector and module. Operational audits and labor compliance checks.",
+      "source": "Excel: /data/entrada/fiscalizacion/ → Inspector field audit records",
+      "grain": "One row per inspection event (fecha, dni, modulo, turno, evaluador)",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Raw", "DNI_Raw", "Modulo_Raw", "Turno_Raw"],
+      "purpose": "Operational compliance auditing & field protocol enforcement tracking"
+    },
+    "Bronce.Fisiologia": {
+      "desc": "Plant physiological state: bud stages (hinchadas/productivas), total organs per tercio (third of plant height). Bud viability tracker.",
+      "source": "Excel: /data/entrada/fisiologia/ → Estado fisiologico (hinchadas+productivas+total_org) por tercio",
+      "grain": "One row per (fecha, modulo, turno, valvula, variedad, brote, tercio) physiological observation",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Raw", "Modulo_Raw", "Turno_Raw", "Valvula_Raw", "Variedad_Raw", "Tercio_Raw", "Hinchadas_Raw", "Productivas_Raw", "Total_Org_Raw"],
+      "purpose": "Flowering potential assessment via bud swelling & productivity predictions from organ counts"
+    },
+    "Bronce.Floracion": {
+      "desc": "Bloom evaluation: plant count in flower per cama (bed) and total evaluated. Early bloom detection & flowering synchrony.",
+      "source": "Excel: /data/entrada/evaluacion_vegetativa/ → Reporte layout con N_Plantas_en_Floracion_Raw + N_Plantas_Evaluadas_Raw",
+      "grain": "One row per (fecha, modulo, turno, valvula, cama, variedad) flowering event",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Raw", "Modulo_Raw", "Turno_Raw", "Valvula_Raw", "Cama_Raw", "N_Plantas_Evaluadas_Raw", "N_Plantas_en_Floracion_Raw"],
+      "purpose": "Bloom timing synchrony, pollination window detection, & fruit set readiness"
+    },
+    "Bronce.Induccion_Floral": {
+      "desc": "Flowering induction results: plants induced, shoots with induction, shoots with flowers (post-induction success). Treatment response tracker.",
+      "source": "Excel: /data/entrada/induccion_floral/ → Induction treatment response (plantas_con_induccion, brotes_con_flor)",
+      "grain": "One row per (fecha, modulo, turno, valvula, cama, variedad, tipo_evaluacion) induction record",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Raw", "Modulo_Raw", "Turno_Raw", "Valvula_Raw", "Cama_Raw", "Variedad_Raw", "PlantasPorCama_Raw", "PlantasConInduccion_Raw", "BrotesConInduccion_Raw", "BrotesTotales_Raw", "BrotesConFlor_Raw"],
+      "purpose": "Flowering induction success rates & off-season flowering control tracking for crop management"
+    },
+    "Bronce.Maduracion": {
+      "desc": "Fruit maturation tracking by organ (berry) color using ribbon marks. Tracks days-to-harvest from color stage observation.",
+      "source": "Excel: /data/entrada/maduracion/ → Organ+Color tracking from marked fruit ribbons",
+      "grain": "One row per (fecha, modulo, turno, valvula, variedad, organo, color) maturation observation",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Raw", "Modulo_Raw", "Turno_Raw", "Valvula_Raw", "Variedad_Raw", "Organo_Raw", "Color_Raw"],
+      "purpose": "Harvest date optimization and on-tree fruit ripeness stage tracking"
+    },
+    "Bronce.Peladas": {
+      "desc": "Stripped/exposed berry count by phenological stage (buttons/flowers/small/large/creams/mature/harvest-ready). Measures disease/damage-exposed fruit.",
+      "source": "Excel: /data/entrada/peladas/ → Peladas (desnudadas) de bayas por etapa fenologica",
+      "grain": "One row per (fecha, modulo, turno, valvula, punto, variedad) pelada count event",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Raw", "Modulo_Raw", "Turno_Raw", "Valvula_Raw", "Punto_Raw", "Variedad_Raw", "BotonesFlorales_Raw", "Flores_Raw", "BayasPequenas_Raw", "BayasGrandes_Raw", "Fase1_Raw", "Fase2_Raw", "BayasCremas_Raw", "BayasMaduras_Raw", "BayasCosechables_Raw"],
+      "purpose": "Disease/damage exposure assessment & sanitation urgency detection for phytosanitary response"
+    },
+    "Bronce.Pintado_Flores": {
+      "desc": "Flower marking/painting status for controlled pollination & flowering induction experiments. Tracks marked flowers.",
+      "source": "Excel: /data/entrada/pintado_flores/ → Marked flower tracking records",
+      "grain": "One row per (fecha, modulo, turno, valvula, variedad) painting event",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Raw", "Modulo_Raw", "Turno_Raw", "Valvula_Raw", "Variedad_Raw"],
+      "purpose": "Pollination experiment control & marked crop harvest tracking"
+    },
+    "Bronce.Proyeccion_Pesos": {
+      "desc": "Weight projection by variety and harvest date. Model inputs for per-berry weight forecasting.",
+      "source": "Excel: /data/entrada/proyeccion_pesos/ → Weight forecast seeds",
+      "grain": "One row per (fecha, modulo, variedad) weight projection",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Raw", "Modulo_Raw", "Variedad_Raw", "Peso_Proyectado_Raw"],
+      "purpose": "Harvest yield forecasting via weight curve projections & per-berry kg estimation"
+    },
+    "Bronce.Reporte_Clima": {
+      "desc": "Daily climate summary: T_max/min, humidity, precipitation. Used for indirect crop modeling when telemetry unavailable.",
+      "source": "Excel: /data/entrada/reporte_clima/ OR hourly telemetry → Daily aggregation",
+      "grain": "One row per (fecha, hora, sector) climate measurement",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Raw", "Hora_Raw", "Sector_Raw", "TempMax_Raw", "TempMin_Raw", "Humedad_Raw", "Precipitacion_Raw"],
+      "purpose": "Crop physiology modeling & disease risk prediction via temperature & humidity thresholds"
+    },
+    "Bronce.Reporte_Cosecha": {
+      "desc": "Harvest daily summary from field: kg net, jaba (box) count. SAP-like but from field reports.",
+      "source": "Excel: /data/entrada/reporte_cosecha/ → Field harvest count consolidation",
+      "grain": "One row per (fecha, modulo, turno, valvula, variedad) harvest day consolidation",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Raw", "Modulo_Raw", "Turno_Raw", "Valvula_Raw", "Variedad_Raw", "KgNeto_Raw", "Jabas_Raw"],
+      "purpose": "Real-time harvest volume tracking & daily production reporting"
+    },
+    "Bronce.Seguimiento_Errores": {
+      "desc": "Field error tracking: plant loss (muertas), stagnation issues. Phytosanitary incident log.",
+      "source": "Excel: /data/entrada/seguimiento_errores/ → Error/incident recording",
+      "grain": "One row per (fecha, modulo, variedad) error incident",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Raw", "Modulo_Raw", "Evaluador_Raw", "Tipo_Error_Raw", "Plantas_Vivas_Raw", "Plantas_Muertas_Raw"],
+      "purpose": "Field health incident tracking & phytosanitary risk alerting"
+    },
+    "Bronce.Tasa_Crecimiento_Brotes": {
+      "desc": "Shoot growth rate measurements over time (historical & daily). Tracks shoot elongation from marking date to measurement.",
+      "source": "Excel: /data/entrada/tasa_crecimiento_brotes/ → Growth measurement timelines (Ensayo → Medida)",
+      "grain": "One row per (fecha, dni, modulo, turno, valvula, cama, tipo_tallo, ensayo) growth measurement",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Raw", "Modulo_Raw", "Turno_Raw", "Valvula_Raw", "Cama_Raw", "Planta_Brote_Raw", "Cantidad_Raw", "Tallo_Raw", "Tipo_Evaluacion_Raw"],
+      "purpose": "Vegetative vigor assessment & shoot development rate tracking for pruning timing"
+    },
+    "Bronce.Variables_Meteorologicas": {
+      "desc": "Meteorological variables (VPD, Radiation) by sector. Sparse updates when available; supplementary to telemetry.",
+      "source": "Excel: /data/entrada/telemetria_clima/ → Low-frequency met variable records",
+      "grain": "One row per (fecha, modulo, sector) met measurement",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Fecha_Raw", "Modulo_Raw", "Sector_Raw", "VPD_Raw", "Radiacion_Raw", "TempMax_Raw", "TempMin_Raw", "Humedad_Raw"],
+      "purpose": "Supplementary crop physiology modeling when real-time telemetry gaps exist"
+    },
+    "Bronce.Telemetria_Clima": {
+      "desc": "Continuous telemetry: hourly T_max/min/ext, humidity, rain, UV, GDD, wind, VPD. Source of truth for climate analytics.",
+      "source": "Automated logger: /data/entrada/telemetria_clima/ (por sector: A01, B02, etc.) → Extract sector from filename",
+      "grain": "One row per (semana, fecha_hora, sector) hourly climate reading",
+      "parents": [],
+      "schema": "Bronce",
+      "raw_cols": ["Semana_Raw", "FechaHora_Raw", "Sector_Raw", "Temp_Exterior_Raw", "Temp_Maxima_Raw", "Temp_Minima_Raw", "Humedad_Externa_Raw", "Lluvia_Raw", "Radiacion_Solar_Raw", "Indice_UV_Raw"],
+      "purpose": "Continuous crop physiology monitoring, disease risk modeling, & VPD/GDD calculations for scheduling"
+    },
+    "Silver.Dim_Actividad_Operativa": {
+      "desc": "Activity catalog: work task names and their associated labor codes (cultivo/cosecha/empaque). Links SAP to field operations.",
+      "source": "Bronce.Consolidado_Tareos deduplicated activity+labor → MDM rules for homologacion",
+      "grain": "One row per (nombre_actividad, nombre_labor) combination",
+      "parents": ["Bronce.Consolidado_Tareos"],
+      "schema": "Silver",
+      "purpose": "Labor cost allocation & productivity metrics by operational task type"
+    },
+    "Silver.Dim_Cama_Catalogo": {
+      "desc": "Catalog of all bed/planting line codes in production. Normalized against typos & variations.",
+      "source": "Raw field records → Homologacion (MDM) → Dim_Cama_Catalogo",
+      "grain": "One row per unique cama_normalizada",
+      "parents": [],
+      "schema": "Silver",
+      "purpose": "Geography hierarchy grain normalization for plot-level granularity"
+    },
+    "Silver.Dim_Campana": {
+      "desc": "Campaign/season master list: production season identifier with status (active/closed/archive). Cross-references all facts.",
+      "source": "Config.Parametros_Pipeline or manual catalog → Dim_Campana with año_cosecha",
+      "grain": "One row per (año_cosecha, nombre_campana)",
+      "parents": [],
+      "schema": "Silver",
+      "purpose": "Temporal scoping for multi-season analytics & cross-campaign benchmarking"
+    },
+    "Silver.Dim_Cinta": {
+      "desc": "Ribbon color codes for fruit maturation stage marking (rojo/naranja/amarillo/verde). Tracks marked fruit ripeness.",
+      "source": "Bronce.Ciclos_Fenologicos/Maduracion → Unique colors → Dim_Cinta",
+      "grain": "One row per color_cinta",
+      "parents": ["Bronce.Ciclos_Fenologicos", "Bronce.Maduracion"],
+      "schema": "Silver",
+      "purpose": "Fruit ripeness stage classification for harvest timing optimization"
+    },
+    "Silver.Dim_Condicion_Cultivo": {
+      "desc": "Growing condition types: sustrato (soil/hydro/coconut coir) and certification (organic/conventional). Links to production method.",
+      "source": "Manual catalog → Dim_Condicion_Cultivo (Sustrato + Certificacion)",
+      "grain": "One row per (sustrato, certificacion) combination",
+      "parents": [],
+      "schema": "Silver",
+      "purpose": "Harvest reconciliation scoping & yield model stratification by growing method"
+    },
+    "Silver.Dim_Escenario_Proyeccion": {
+      "desc": "Projection model scenarios: optimistic/pessimistic/base case with 6/12/20-week horizons. Model variant tracking.",
+      "source": "Config.Parametros_Pipeline ESCENARIO_PROYECCION_* → Dim_Escenario_Proyeccion",
+      "grain": "One row per tipo_escenario (Conservative/Base/Optimistic)",
+      "parents": [],
+      "schema": "Silver",
+      "purpose": "Projection ensemble scoping & forecast confidence band definition"
+    },
+    "Silver.Dim_Estado_Fenologico": {
+      "desc": "Phenological stage ontology: buds/flowers/small fruit/medium/large/mature/harvest. Ordered progression from flower to ripeness.",
+      "source": "Bronce.Ciclos_Fenologicos/Conteo_Fruta → Unique etapa_fenologica → Dim_Estado_Fenologico with orden",
+      "grain": "One row per estado_fenologico with orden (1-7 or similar)",
+      "parents": ["Bronce.Ciclos_Fenologicos", "Bronce.Conteo_Fruta"],
+      "schema": "Silver",
+      "purpose": "Fruit development stage tracking & harvest readiness classification"
+    },
+    "Silver.Dim_Estado_Workflow": {
+      "desc": "Projection workflow states: draft/validated/override/rejected/published. Production release decision states.",
+      "source": "Portal MDM workflow / projection workflow codes",
+      "grain": "One row per estado (draft/validated/published)",
+      "parents": [],
+      "schema": "Silver",
+      "purpose": "Projection approval flow tracking & version control"
+    },
+    "Silver.Dim_Fundo_Catalogo": {
+      "desc": "Farm/estate master list: Fundo names (Las Cruces/San Martin/etc). Top geography hierarchy level.",
+      "source": "Bronce.[all] → Unique fundo_raw → MDM homologacion → Dim_Fundo_Catalogo",
+      "grain": "One row per fundo",
+      "parents": [],
+      "schema": "Silver",
+      "purpose": "Estate-level geographical rollup for production analytics & management reporting"
+    },
+    "Silver.Dim_Geografia": {
+      "desc": "Complete geographical hierarchy: Fundo→Sector→Modulo→Turno→Valvula→Cama. Denormalized 6-level geography composite key with test_block flag.",
+      "source": "Dim_Fundo_Catalogo + Dim_Sector + Dim_Modulo + Dim_Turno + Dim_Valvula + Dim_Cama → Join & denormalize",
+      "grain": "One row per (fundo, sector, modulo, turno, valvula, cama) unique combination at chosen granularidad",
+      "parents": ["Silver.Dim_Fundo_Catalogo", "Silver.Dim_Sector_Catalogo", "Silver.Dim_Modulo_Catalogo", "Silver.Dim_Turno_Catalogo", "Silver.Dim_Valvula_Catalogo", "Silver.Dim_Cama_Catalogo"],
+      "schema": "Silver",
+      "purpose": "Normalized geography reference for all fact tables; enables cross-location rollups & field-level detail"
+    },
+    "Silver.Dim_Modulo_Catalogo": {
+      "desc": "Module (growing section) catalog with optional sub-module and training system (umbrella/espalier/etc).",
+      "source": "Bronce.[all] → Unique modulo_raw → MDM homologacion → Dim_Modulo_Catalogo",
+      "grain": "One row per (modulo, submodulo, tipo_conduccion) combination",
+      "parents": [],
+      "schema": "Silver",
+      "purpose": "Plot-level geography reference & production method classification"
+    },
+    "Silver.Dim_Personal": {
+      "desc": "Employee directory: DNI, full name, role, sex, payroll ID, asertivity pct %, absenteeism days. Field worker master.",
+      "source": "Bronce.Consolidado_Tareos + HR system → Deduplicate dni → Dim_Personal",
+      "grain": "One row per unique dni",
+      "parents": ["Bronce.Consolidado_Tareos"],
+      "schema": "Silver",
+      "purpose": "Labor KPI tracking (accuracy, attendance) & field responsibility assignment"
+    },
+    "Silver.Dim_Sector_Catalogo": {
+      "desc": "Production sector/zone codes (geographic divisions within a farm). Grouping above modules.",
+      "source": "Bronce.[all] → Unique sector_raw → MDM homologacion → Dim_Sector_Catalogo",
+      "grain": "One row per sector",
+      "parents": [],
+      "schema": "Silver",
+      "purpose": "Mid-level geography hierarchy for climate zone stratification & field clustering"
+    },
+    "Silver.Dim_Tiempo": {
+      "desc": "Date dimension with ISO week, cosecha week, day-of-week, month name, weekend flag. Bridges gregorian & agricultural calendar.",
+      "source": "Config calendar builder → Generate 2020-2035 → Dim_Tiempo",
+      "grain": "One row per date",
+      "parents": [],
+      "schema": "Silver",
+      "purpose": "Time-based fact aggregation & harvest season alignment across gregorian/agri-calendars"
+    },
+    "Silver.Dim_Turno_Catalogo": {
+      "desc": "Shift codes (1/2/3 or A/B/C). Identifies work shift for labor & field operations.",
+      "source": "Bronce.[all] → Unique turno_raw → MDM homologacion → Dim_Turno_Catalogo",
+      "grain": "One row per turno",
+      "parents": [],
+      "schema": "Silver",
+      "purpose": "Labor scheduling & shift-level productivity analysis"
+    },
+    "Silver.Dim_Valvula_Catalogo": {
+      "desc": "Irrigation valve/water block codes. Sub-module irrigation zone identifier.",
+      "source": "Bronce.[all] → Unique valvula_raw → MDM homologacion → Dim_Valvula_Catalogo",
+      "grain": "One row per valvula",
+      "parents": [],
+      "schema": "Silver",
+      "purpose": "Water management zone reference & irrigation-based crop segmentation"
+    },
+    "Silver.Dim_Variedad": {
+      "desc": "Blueberry variety master: variety name and breeder. Genetic classification for yield model stratification.",
+      "source": "Bronce.[all] → Unique variedad_raw → MDM homologacion → Dim_Variedad",
+      "grain": "One row per variedad_normalizada",
+      "parents": [],
+      "schema": "Silver",
+      "purpose": "Variety-specific yield model parameters, disease resistance profiles, & harvest scheduling"
+    },
+    "Silver.Fact_areas_plantas": {
+      "desc": "Area (hectares) and plant count by geography, variety, and date. Supports per-plant and per-hectare yield calculations.",
+      "source": "Bronce.Cosecha_SAP (area_raw + plantas_raw) → Fact_areas_plantas",
+      "grain": "One row per (fecha, id_geografia, id_variedad, id_condicion) population snapshot",
+      "parents": ["Bronce.Cosecha_SAP"],
+      "schema": "Silver",
+      "purpose": "Per-plant yield normalization & area-adjusted productivity metrics"
+    },
+    "Silver.Fact_Censo_Plantas": {
+      "desc": "Plant health census: counts of healthy/regular/bad plants by geography and date. Population health tracker.",
+      "source": "Bronce.Censo_Plantas → Parse estado_planta → Fact_Censo_Plantas",
+      "grain": "One row per (fecha, id_geografia, id_variedad, id_campana) census date",
+      "parents": ["Bronce.Censo_Plantas"],
+      "schema": "Silver",
+      "purpose": "Field health monitoring for replant planning & attrition forecasting"
+    },
+    "Silver.Fact_Ciclo_Poda": {
+      "desc": "Pruning quality metrics: shoot counts, lengths, diameters, defects per geography. Post-pruning crop structure assessment.",
+      "source": "Bronce.Evaluacion_Calidad_Poda → Clean & aggregate → Fact_Ciclo_Poda",
+      "grain": "One row per (fecha, id_geografia, id_variedad, id_campana) poda observation",
+      "parents": ["Bronce.Evaluacion_Calidad_Poda"],
+      "schema": "Silver",
+      "purpose": "Pruning quality QA & shoot structure standardization tracking"
+    },
+    "Silver.Fact_Ciclos_Fenologicos": {
+      "desc": "Fruit phenology and ripeness by color ribbon marking (cinta). Tracks marked fruit development stages.",
+      "source": "Bronce.Maduracion → Join with Dim_Cinta → Fact_Ciclos_Fenologicos",
+      "grain": "One row per (fecha, id_geografia, id_variedad, id_cinta, id_organo, id_estado_fenologico, id_campana)",
+      "parents": ["Bronce.Maduracion", "Silver.Dim_Cinta", "Silver.Dim_Estado_Fenologico"],
+      "schema": "Silver",
+      "purpose": "Harvest timing optimization via fruit ripeness stage tracking & color-based ripeness classification"
+    },
+    "Silver.Fact_Conteo_Fenologico": {
+      "desc": "Fruit phenological stage count: total organs by stage (buds/flowers/small/medium/large/mature) per geography. Core forecasting input.",
+      "source": "Bronce.Conteo_Fruta → Parse estado_fenologico → Aggregate bayas por stage → Fact_Conteo_Fenologico",
+      "grain": "One row per (fecha, id_geografia, id_variedad, id_estado_fenologico, id_personal, id_campana) phenology count",
+      "parents": ["Bronce.Conteo_Fruta"],
+      "schema": "Silver",
+      "purpose": "Harvest supply forecasting via fruit stage progression modeling; core input to 6-week projection models"
+    },
+    "Silver.Fact_Cosecha_SAP": {
+      "desc": "Harvest actuals from SAP: kg_neto_mp by geography, variety, date, and cultivation condition. Source-of-truth yield data.",
+      "source": "Bronce.Cosecha_SAP → Parse geografia + normalize → Join with Dim_Condicion_Cultivo → Fact_Cosecha_SAP",
+      "grain": "One row per (fecha, id_geografia, id_variedad, id_condicion_cultivo, id_campana) harvest transaction",
+      "parents": ["Bronce.Cosecha_SAP", "Silver.Dim_Condicion_Cultivo"],
+      "schema": "Silver",
+      "purpose": "Harvest volume truth-set for projection model comparison, yield analytics, & forecast accuracy measurement"
+    },
+    "Silver.Fact_Evaluacion_Pesos": {
+      "desc": "Berry weight samples by stage: average g/berry with projected harvest weight and sample size per geography/date.",
+      "source": "Bronce.Evaluacion_Pesos → Clean weights (g/baya) → Calculate harvest projection → Fact_Evaluacion_Pesos",
+      "grain": "One row per (fecha, id_geografia, id_variedad, id_personal, id_campana) weight sample event",
+      "parents": ["Bronce.Evaluacion_Pesos"],
+      "schema": "Silver",
+      "purpose": "Berry weight trajectory modeling for yield prediction; per-berry kg curve fitting from samples"
+    },
+    "Silver.Fact_Evaluacion_Vegetativa": {
+      "desc": "Plant vegetative structure by floor (piso): shoot count, productivity ratio, heights by geography and week post-pruning.",
+      "source": "Bronce.Evaluacion_Vegetativa → Parse pisos 1-5 → Aggregate per piso → Fact_Evaluacion_Vegetativa",
+      "grain": "One row per (fecha, id_geografia, id_variedad, piso, semanas_poda, id_campana) floor measurement",
+      "parents": ["Bronce.Evaluacion_Vegetativa"],
+      "schema": "Silver",
+      "purpose": "Plant structure tracking for disease prediction, pollination assessment, & crop maturity validation"
+    },
+    "Silver.Fact_Fisiologia": {
+      "desc": "Plant physiology: bud swelling states (hinchadas/productivas) and total organs per canopy third. Bud viability indicator.",
+      "source": "Bronce.Fisiologia → Parse tercio + buds → Fact_Fisiologia",
+      "grain": "One row per (fecha, id_geografia, id_variedad, tercio, id_campana) physiology observation",
+      "parents": ["Bronce.Fisiologia"],
+      "schema": "Silver",
+      "purpose": "Flowering potential prediction & bud set assessment for off-season flowering control"
+    },
+    "Silver.Fact_Floracion": {
+      "desc": "Flowering event: plant count in flower and total evaluated per bed and geography. Bloom window tracker.",
+      "source": "Bronce.Floracion → Parse plantas_en_floracion → Fact_Floracion",
+      "grain": "One row per (fecha, id_geografia, id_variedad, id_personal, id_campana) flowering date",
+      "parents": ["Bronce.Floracion"],
+      "schema": "Silver",
+      "purpose": "Bloom synchrony & pollination window detection for fruit set optimization"
+    },
+    "Silver.Fact_Induccion_Floral": {
+      "desc": "Off-season flowering induction: success rate (plants induced, shoots with flowers post-treatment). Treatment response tracker.",
+      "source": "Bronce.Induccion_Floral → Calculate pct_induccion + pct_floracion → Fact_Induccion_Floral",
+      "grain": "One row per (fecha, id_geografia, id_variedad, id_personal, id_campana) induction event",
+      "parents": ["Bronce.Induccion_Floral"],
+      "schema": "Silver",
+      "purpose": "Flowering induction protocol validation & counter-seasonal harvest scheduling success rate"
+    },
+    "Silver.Fact_Maduracion": {
+      "desc": "Fruit maturation progress via ribbon color marking: days elapsed from marking, color state, organ/cluster tracking.",
+      "source": "Bronce.Ciclos_Fenologicos + Bronce.Maduracion → Match marked fruits → Track color progression → Fact_Maduracion",
+      "grain": "One row per (fecha, id_geografia, id_variedad, id_cinta, id_organo, id_estado_fenologico, id_campana) marked fruit tracking",
+      "parents": ["Bronce.Ciclos_Fenologicos", "Bronce.Maduracion"],
+      "schema": "Silver",
+      "purpose": "Harvest scheduling precision via on-tree ripeness stage monitoring and color-coded fruit classification"
+    },
+    "Silver.Fact_Peladas": {
+      "desc": "Exposed/stripped berry count (damage/disease): by stage per geography. Sanitation urgency indicator.",
+      "source": "Bronce.Peladas → Parse estado_fenologico → Count peladas per stage → Fact_Peladas",
+      "grain": "One row per (fecha, id_geografia, id_variedad, id_estado_fenologico, id_personal, punto, id_campana) pelada count",
+      "parents": ["Bronce.Peladas"],
+      "schema": "Silver",
+      "purpose": "Disease/damage exposure tracking & phytosanitary response triggering"
+    },
+    "Silver.Fact_Proyecciones": {
+      "desc": "Weekly harvest forecast: kg_proyectados by scenario (base/optimistic/pessimistic) with MAPE accuracy & override flags.",
+      "source": "Projection model (6-week + weekly updates) → Fact_Proyecciones with version control & overrides",
+      "grain": "One row per (fecha_evento, fecha_cutoff, id_geografia, id_variedad, id_escenario, id_campana, id_estado_workflow)",
+      "parents": [],
+      "schema": "Silver",
+      "purpose": "Weekly harvest supply forecast for sales/logistics planning; model accuracy tracking & scenario sensitivity analysis"
+    },
+    "Silver.Fact_Tareo": {
+      "desc": "Labor timesheet: hours worked by worker, activity, labor type per date and geography. SAP-linked payroll records.",
+      "source": "Bronce.Consolidado_Tareos → Link to Dim_Personal + Dim_Actividad_Operativa → Fact_Tareo",
+      "grain": "One row per (fecha, id_personal, id_actividad_operativa, id_geografia, id_campana) labor record",
+      "parents": ["Bronce.Consolidado_Tareos", "Silver.Dim_Personal", "Silver.Dim_Actividad_Operativa"],
+      "schema": "Silver",
+      "purpose": "Labor cost allocation, productivity KPIs by task type, & payroll integration"
+    },
+    "Silver.Fact_Tasa_Crecimiento_Brotes": {
+      "desc": "Shoot elongation rate (cm/day) from marking to measurement. Growth vigor indicator for pruning timing.",
+      "source": "Bronce.Tasa_Crecimiento_Brotes → Calculate dias_desde_poda + growth_rate → Fact_Tasa_Crecimiento_Brotes",
+      "grain": "One row per (fecha, id_geografia, id_variedad, id_personal, id_condicion, codigo_ensayo, id_campana) growth measurement",
+      "parents": ["Bronce.Tasa_Crecimiento_Brotes"],
+      "schema": "Silver",
+      "purpose": "Vegetative vigor assessment & optimal pruning window determination"
+    },
+    "Silver.Fact_Telemetria_Clima": {
+      "desc": "Continuous hourly climate: T_exterior, T_max/min, humidity, precipitation, UV, radiation, VPD (calculated). 24/7 microclimate monitoring.",
+      "source": "Bronce.Telemetria_Clima (raw Excel hourly logs) → Parse FechaHora → Join with Dim_Tiempo → Fact_Telemetria_Clima",
+      "grain": "One row per (fecha_hora, sector_climatico, id_campana) hourly observation",
+      "parents": ["Bronce.Telemetria_Clima"],
+      "schema": "Silver",
+      "purpose": "Continuous crop physiology modeling (VPD/GDD/heat stress), disease risk prediction, irrigation scheduling"
+    },
+    "Silver.Bridge_Geografia_Cama": {
+      "desc": "Many-to-many relationship: geography can have multiple camas (beds) and vice-versa. Resolves plot-level granularity.",
+      "source": "Bronce.[all facts] → Extract unique (id_geografia, id_cama_catalogo) pairs → Bridge_Geografia_Cama",
+      "grain": "One row per (id_geografia, id_cama_catalogo) active relationship",
+      "parents": ["Silver.Dim_Geografia", "Silver.Dim_Cama_Catalogo"],
+      "schema": "Silver",
+      "purpose": "Geography hierarchy flexibility; enables plot-within-geography analysis for sub-module detail"
+    },
+    "Silver.Bridge_Geografia_Campana_Condicion": {
+      "desc": "Many-to-many: which geography×condition is active in which campaign. Tracks growing method changes per season.",
+      "source": "Config.Parametros_Pipeline + Bronce facts → Hash-based dedup → Bridge_Geografia_Campana_Condicion",
+      "grain": "One row per (id_geografia, id_campana, id_condicion) active relationship",
+      "parents": ["Silver.Dim_Geografia", "Silver.Dim_Campana", "Silver.Dim_Condicion_Cultivo"],
+      "schema": "Silver",
+      "purpose": "Multi-season cultivation method tracking & condition-specific yield model application"
+    },
+    "Silver.Bridge_Modulo_Campana": {
+      "desc": "Many-to-many: module is active under certain variety and campaign. Tracks planting plan & season scheduling.",
+      "source": "Config.Parametros_Pipeline + SAP field mapping → Bridge_Modulo_Campana",
+      "grain": "One row per (id_modulo_catalogo, id_variedad, id_campana) planting assignment",
+      "parents": ["Silver.Dim_Modulo_Catalogo", "Silver.Dim_Variedad", "Silver.Dim_Campana"],
+      "schema": "Silver",
+      "purpose": "Planting plan reference & variety-campaign-module assignment tracking"
+    },
+    "Gold.Mart_Administrativo": {
+      "desc": "Labor analytics: weekly hours by person, activity, asertivity %, observed-in-SAP flag. HR operational metrics.",
+      "source": "Silver.Fact_Tareo + Silver.Dim_Personal + Silver.Dim_Actividad_Operativa → Aggregate by semana_iso",
+      "grain": "One row per (semana_iso, dni_personal, id_actividad, id_campana)",
+      "parents": ["Silver.Fact_Tareo", "Silver.Dim_Personal"],
+      "schema": "Gold",
+      "purpose": "Weekly labor KPI dashboard: hours, attendance, accuracy %; operational HR reporting to management"
+    },
+    "Gold.Mart_Ciclo_Poda": {
+      "desc": "Pruning cycle quality scorecard: avg tallos/shoots per plant, lengths, diameters, defects by geography/week.",
+      "source": "Silver.Fact_Ciclo_Poda + Silver.Dim_Geografia → Aggregate by semana_iso + modulo",
+      "grain": "One row per (semana_iso, id_geografia, id_variedad, id_campana)",
+      "parents": ["Silver.Fact_Ciclo_Poda"],
+      "schema": "Gold",
+      "purpose": "Pruning execution QA & shoot structure standardization dashboard for field supervisors"
+    },
+    "Gold.Mart_Clima": {
+      "desc": "Climate analytics: daily avg/max temps, VPD, humidity, rainfall, GDD by sector and week. Crop physiology input.",
+      "source": "Silver.Fact_Telemetria_Clima → Daily aggregation with Tetens VPD + GDD calculation → Gold.Mart_Clima",
+      "grain": "One row per (id_tiempo, sector_climatico, semana_iso, id_campana) daily climate summary",
+      "parents": ["Silver.Fact_Telemetria_Clima"],
+      "schema": "Gold",
+      "purpose": "Climate-crop physiology analytics: disease risk, heat stress, irrigation scheduling DSS"
+    },
+    "Gold.Mart_Cosecha": {
+      "desc": "Weekly harvest summary: kg_neto (actual) vs kg_proyectados (forecast) with fulfillment %, by geography/variety.",
+      "source": "Silver.Fact_Cosecha_SAP + Silver.Fact_Proyecciones → Join by (fecha, geografia, variedad, campana) → Gold.Mart_Cosecha",
+      "grain": "One row per (semana_iso, id_geografia, id_variedad, id_campana) harvest week",
+      "parents": ["Silver.Fact_Cosecha_SAP", "Silver.Fact_Proyecciones"],
+      "schema": "Gold",
+      "purpose": "Weekly supply/sales dashboard: actual vs forecast fulfillment tracking & forecast accuracy metrics"
+    },
+    "Gold.Mart_Evaluacion_Vegetativa": {
+      "desc": "Vegetative structure summary by floor: avg heights, shoots, diameters, productivity ratio (productive/total) by geography/week.",
+      "source": "Silver.Fact_Evaluacion_Vegetativa → Aggregate by semana_iso + piso + modulo",
+      "grain": "One row per (semana_iso, piso, id_geografia, id_variedad, id_campana)",
+      "parents": ["Silver.Fact_Evaluacion_Vegetativa"],
+      "schema": "Gold",
+      "purpose": "Plant structure dashboard for agronomists: vigor assessment, disease risk prediction, harvest readiness"
+    },
+    "Gold.Mart_Fenologia": {
+      "desc": "Phenological stage summary: fruit count by stage (buttons/flowers/small/medium/large/mature/harvest) by geography/week.",
+      "source": "Silver.Fact_Conteo_Fenologico + Silver.Fact_Fisiologia + Silver.Fact_Ciclos_Fenologicos → Aggregate by semana_iso",
+      "grain": "One row per (semana_iso, modulo, variedad, id_estado_fenologico, id_campana)",
+      "parents": ["Silver.Fact_Conteo_Fenologico", "Silver.Fact_Fisiologia"],
+      "schema": "Gold",
+      "purpose": "Harvest forecasting dashboard: fruit stage progression model tracking & supply projection input validation"
+    },
+    "Gold.Mart_Induccion_Floral": {
+      "desc": "Induction campaign summary: success rate (% plants induced with flowers) by geography and campaign for counter-seasonal crops.",
+      "source": "Silver.Fact_Induccion_Floral → Calculate success % → Gold.Mart_Induccion_Floral",
+      "grain": "One row per (id_geografia, id_variedad, id_campana) induction campaign",
+      "parents": ["Silver.Fact_Induccion_Floral"],
+      "schema": "Gold",
+      "purpose": "Off-season flowering control dashboard & counter-seasonal harvest scheduling effectiveness tracking"
+    },
+    "Gold.Mart_Pesos_Calibres": {
+      "desc": "Berry weight analysis: avg g/berry by stage + caliber distribution (small/medium/large). Harvest quality metrics.",
+      "source": "Silver.Fact_Evaluacion_Pesos + Bronce.Calibres → Join + weight curve fitting → Gold.Mart_Pesos_Calibres",
+      "grain": "One row per (semana_iso, id_geografia, id_variedad, id_campana) weight tracking week",
+      "parents": ["Silver.Fact_Evaluacion_Pesos"],
+      "schema": "Gold",
+      "purpose": "Harvest quality dashboard: berry weight progression, caliber distribution, fruit maturity validation"
+    },
+    "Gold.Mart_Proyecciones": {
+      "desc": "Projection executive summary: weekly kg_proyectados (base scenario) by geography/variety with MAPE, override flags, model version.",
+      "source": "Silver.Fact_Proyecciones (filtered on ESCENARIO_PROYECCION_OFICIAL) → Join with actuals → Gold.Mart_Proyecciones",
+      "grain": "One row per (semana_iso, id_geografia, id_variedad, id_campana) projection week",
+      "parents": ["Silver.Fact_Proyecciones", "Silver.Fact_Cosecha_SAP"],
+      "schema": "Gold",
+      "purpose": "Executive forecast dashboard: weekly harvest supply projection, accuracy tracking, override audit trail"
+    },
+    "Gold.Mart_Tasa_Crecimiento": {
+      "desc": "Growth rate summary: avg cm/day shoot elongation by condition (experiment/control) and geography. Pruning timing decision support.",
+      "source": "Silver.Fact_Tasa_Crecimiento_Brotes → Aggregate by semana_iso + condicion",
+      "grain": "One row per (semana_iso, id_geografia, id_variedad, condicion, id_campana) growth tracking period",
+      "parents": ["Silver.Fact_Tasa_Crecimiento_Brotes"],
+      "schema": "Gold",
+      "purpose": "Pruning schedule DSS: growth rate tracking & optimal pruning window determination"
+    },
+    "Auditoria.Carga_Archivos": {
+      "desc": "Audit log of file loads: which file loaded to which table when, status (OK/ERROR), row counts, errors. Complete data lineage.",
+      "source": "ETL logging → auditoria/log.py registrar_inicio/registrar_fin → Auditoria.Carga_Archivos",
+      "grain": "One row per file load event",
+      "parents": [],
+      "schema": "Auditoria",
+      "purpose": "Data lineage & ETL execution audit trail for compliance & debugging"
+    },
+    "Control.Parametros_Pipeline": {
+      "desc": "ETL configuration: fact blockers, scenario IDs, projection horizons, DQ thresholds. Single source of truth for pipeline logic.",
+      "source": "Config.parametros.py → Stored as JSON in Control.Parametros_Pipeline",
+      "grain": "One row per parameter key",
+      "parents": [],
+      "schema": "Control",
+      "purpose": "ETL configuration management & feature flags (facts_bloqueantes, escenario_oficial, dq_thresholds)"
+    },
+    "Seguridad.Roles_Acceso": {
+      "desc": "Role-based access control: user groups and table-level permissions (read/write/admin). Multi-tenancy scoping.",
+      "source": "Portal MDM user management → Seguridad.Roles_Acceso",
+      "grain": "One row per (rol, tabla, permiso) assignment",
+      "parents": [],
+      "schema": "Seguridad",
+      "purpose": "Data access control & Portal MDM user permission enforcement"
+    },
+    "Config.Homologacion_MDM": {
+      "desc": "Data homologation rules: raw value → normalized value mappings for all catalogs (fundo/modulo/turno/valvula/cama/variedad). Master data governance.",
+      "source": "Manual MDM rules + Portal MDM edits → Config.Homologacion_MDM",
+      "grain": "One row per (tabla_destino, valor_raw, valor_normalizado) mapping rule",
+      "parents": [],
+      "schema": "Config",
+      "purpose": "Raw field data standardization & data quality consistency across all sources"
+    }
+  },
+  "summary": {
+    "bronce_count": 25,
+    "silver_count": 37,
+    "gold_count": 12,
+    "auxiliary_count": 5,
+    "total_tables": 79,
+    "medallion_structure": {
+      "bronce": "Raw Excel/SAP ingestion, all NVARCHAR, preserve original values with audit trail",
+      "silver": "Cleaned, normalized facts & dimensions with MDM rules, typed columns, quality gates",
+      "gold": "Aggregated marts for Power BI, fact joins, week-level grain, executive reporting"
+    }
+  }
+}

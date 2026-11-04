@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "dataflow",
+  "quality": "showcase",
+  "specification": {
+    "path": "D:\\DataWareHouse-main\\.archify\\architecture-acp-audit-20261103-204308\\etl.candidate.json",
+    "sha256": "ec260c73769e55eaebeca6543aa11badf8527914642eea9a6ae6f7d9455a0659",
+    "bytes": 4903
+  },
+  "artifact": {
+    "path": "D:\\DataWareHouse-main\\.archify\\architecture-acp-audit-20261103-204308\\flujo-etl.html",
+    "sha256": "135a6b158782286a347bfe2744fcd0e1c8d57acc7b7859064e0666ee8120d675",
+    "bytes": 822200
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "D:\\DataWareHouse-main\\.archify\\architecture-acp-audit-20261103-204308\\etl-review-2\\flujo-etl.finalize.json",
+    "summaryReceipt": "D:\\DataWareHouse-main\\.archify\\architecture-acp-audit-20261103-204308\\etl-review-2\\flujo-etl.finalize-summary.json",
+    "browserCheckReceipt": "D:\\DataWareHouse-main\\.archify\\architecture-acp-audit-20261103-204308\\etl-review-2\\flujo-etl.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 2813,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  }
+}

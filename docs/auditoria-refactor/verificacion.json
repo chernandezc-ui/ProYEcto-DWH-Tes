@@ -1,0 +1,24 @@
+{
+  "application_python_files_checked": 209,
+  "application_files_changed": [],
+  "backlog_items": 36,
+  "map_receipts": [
+    {
+      "file": ".archify/architecture-acp-audit-20261103-204308/arquitectura-actual.finalize.json",
+      "status": "pass",
+      "visual_review": "not-requested"
+    },
+    {
+      "file": ".archify/architecture-acp-audit-20261103-204308/etl-review-3/flujo-etl.finalize.json",
+      "status": "pass",
+      "visual_review": "not-requested"
+    },
+    {
+      "file": ".archify/architecture-acp-audit-20261103-204308/refactor-propuesto.finalize.json",
+      "status": "pass",
+      "visual_review": "not-requested"
+    }
+  ],
+  "application_tests_this_round": "not run; proposal-only task",
+  "scope": "No runtime code, environment configuration, or databases modified in this proposal round."
+}

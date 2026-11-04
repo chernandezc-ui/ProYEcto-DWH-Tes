@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "dataflow",
+  "quality": "showcase",
+  "specification": {
+    "path": "D:\\DataWareHouse-main\\.archify\\architecture-acp-audit-20261103-204308\\etl.candidate.json",
+    "sha256": "2aa8f907a2596df8b3005c51422f63170570926a11133edc3a596708d83c374d",
+    "bytes": 4903
+  },
+  "artifact": {
+    "path": "D:\\DataWareHouse-main\\.archify\\architecture-acp-audit-20261103-204308\\flujo-etl.html",
+    "sha256": "3ef3ef7dd00e8b0e4a52e2005078eb56d62534659c37e4ee9805e9939a892625",
+    "bytes": 823043
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "D:\\DataWareHouse-main\\.archify\\architecture-acp-audit-20261103-204308\\flujo-etl.finalize.json",
+    "summaryReceipt": "D:\\DataWareHouse-main\\.archify\\architecture-acp-audit-20261103-204308\\flujo-etl.finalize-summary.json",
+    "browserCheckReceipt": "D:\\DataWareHouse-main\\.archify\\architecture-acp-audit-20261103-204308\\flujo-etl.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 2690,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  },
+  "visualReviewRecommendation": {
+    "action": "inspect-route-readability",
+    "signals": {
+      "resolvedCrossovers": 1,
+      "routesOverSuggestedBends": 1,
+      "routesOverSuggestedStretch": 1
+    },
+    "reason": "Automated gates passed, but crossings or detours still need perceptual review before claiming visual quality.",
+    "affectedRoutes": {
+      "crossings": [
+        {
+          "left": {
+            "id": "write-errors",
+            "from": "transformar",
+            "to": "cuarentena",
+            "label": "filas rechazadas",
+            "collectionIndex": 5,
+            "artifactIndex": 6
+          },
+          "right": {
+            "id": "view-read",
+            "from": "silver",
+            "to": "gold",
+            "label": "hechos SQL",
+            "collectionIndex": 7,
+            "artifactIndex": 8
+          },
+          "point": [
+            889,
+            385
+          ]
+        }
+      ],
+      "detours": [
+        {
+          "relationship": {
+            "id": "view-read",
+            "from": "silver",
+            "to": "gold",
+            "label": "hechos SQL",
+            "collectionIndex": 7,
+            "artifactIndex": 8
+          },
+          "bends": 4,
+          "stretch": 1.835,
+          "directCorridorBlockers": [
+            {
+              "id": "cuarentena",
+              "label": "Cuarentena",
+              "box": [
+                904,
+                356,
+                112,
+                58
+              ]
+            }
+          ]
+        }
+      ],
+      "truncated": false
+    },
+    "repair": "Advisory only: this mode places or routes these relationships itself. Report them; do not remove relationships or meaning to reduce crossings."
+  }
+}

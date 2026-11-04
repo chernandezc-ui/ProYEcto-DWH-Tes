@@ -1,0 +1,114 @@
+{
+  "database": "ACP_E2E_20261104_005725_b1f328",
+  "server": "localhost\\LOCALHOST",
+  "checks": {
+    "excel_bronze_silver_gold": {
+      "poda": 2,
+      "conteo": 2,
+      "censo": 2,
+      "pesos": 12,
+      "organs_by_geography": [
+        [
+          1,
+          100
+        ],
+        [
+          2,
+          200
+        ]
+      ]
+    },
+    "migrations": {
+      "database": "ACP_E2E_20261104_005725_b1f328",
+      "good": "OK",
+      "delayed_error": "ERROR",
+      "audit_error": "ERROR",
+      "rollback_values": [
+        10,
+        20
+      ],
+      "ledger": {
+        "e2e_migration_good.sql": "OK",
+        "e2e_migration_delayed_error.sql": "ERROR",
+        "e2e_migration_audit_failure.sql": "ERROR"
+      }
+    },
+    "incremental_idempotence": "PASS",
+    "http_auth_projection": {
+      "details": 12,
+      "week1_kg": {
+        "E2E_A": 3.0,
+        "E2E_B": 16.0
+      },
+      "saved": [
+        [
+          1,
+          6,
+          3.0
+        ],
+        [
+          2,
+          6,
+          16.0
+        ]
+      ]
+    },
+    "http_runner_atomic_rerun": {
+      "id": "f06b3d9c-cdbf-413b-87d9-c82c7486befe",
+      "status": "OK",
+      "steps": 7,
+      "sse_fin": true
+    },
+    "rollback_after_real_insert_failure": {
+      "id": "16d948e4-857a-4c64-8cf7-a41a6244a8ba",
+      "status": "ERROR",
+      "fact_preserved": true,
+      "bronze_preserved": true,
+      "quarantine_preserved": true
+    },
+    "runner_recovery_and_full_run": {
+      "recovery": "c9f29cb7-3d12-412b-be8f-65e5a6ed1664",
+      "full": "e4023c70-e0bc-40eb-97c7-8be00aafea86",
+      "status": "OK"
+    },
+    "final_integrity": {
+      "constraint_violations": 0,
+      "disabled_or_untrusted_foreign_keys": 0,
+      "active_runs": 0,
+      "active_lock": null,
+      "temporary_triggers": 0
+    }
+  },
+  "isolation": {
+    "sysadmin": 0,
+    "db_owner_on_test": 1,
+    "existing_database_access": null
+  },
+  "status": "PASS",
+  "source_sha256": {
+    "ETL/mdm/lookup.py": "07625124e9177623f1953e45a388cd75ebf74d1eb24bd9f8ec9e8298f973f080",
+    "ETL/silver/facts/_base_processor.py": "fde5924349540f1384e1da5291489d02ca7eb515b12055706ca7496e469eab5e",
+    "ETL/tools/migration_runner.py": "06749db232a7b3c15f4b484e921e865a08017ac8e8a9eb6495ca2f1050491ef3",
+    "ETL/utils/reproceso_atomico.py": "c787d3a8c0f0bb21fa7db63d6839841bf20f2995c4f44dfcd1b22a710c75829f",
+    "ETL/pipeline.py": "7b288592fb5aab7bb2a482ef015f99ac14c4ab24f1cea6ea11654bfa4b52e13f",
+    "backend/servicios/servicio_proyecciones.py": "db18c7a55833423df67fdfb696df1a23f76b280256cd83c03db85b578dc294b5",
+    "backend/repositorios/repo_proyecciones.py": "5c4719c2dd2967729e11fcd07d9a11ece1c31c1758b0096f657e213114dd6367"
+  },
+  "validation_scope": {
+    "sql_server": true,
+    "odbc_driver": "ODBC Driver 17 for SQL Server",
+    "nonempty_etl_domains": [
+      "conteo",
+      "censo",
+      "pesos",
+      "poda"
+    ],
+    "other_facts": "empty input smoke only",
+    "installation": "versioned snapshot plus explicit isolated bootstrap repairs; not a clean-install certification"
+  },
+  "local_regression": {
+    "passed": 138,
+    "skipped": 1
+  },
+  "process_cleanup": "HTTP backend and runner terminated by the validation harness"
+}

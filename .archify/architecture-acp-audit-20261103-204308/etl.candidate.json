@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "ACP actual: del Excel al dato consultable",
+    "locale": "es",
+    "output": ".archify/architecture-acp-audit-20261103-204308/flujo-etl.html",
+    "quality_profile": "showcase"
+  },
+  "stages": [
+    {
+      "label": "Origen"
+    },
+    {
+      "label": "Ingesta"
+    },
+    {
+      "label": "Fuentes SQL"
+    },
+    {
+      "label": "Operaciones"
+    },
+    {
+      "label": "Salida SQL"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "excel",
+      "type": "external",
+      "label": "Excel",
+      "sublabel": "Archivo original",
+      "stage": 0,
+      "row": 1
+    },
+    {
+      "id": "ingesta",
+      "type": "backend",
+      "label": "Cargador",
+      "sublabel": "Layout y metadatos",
+      "stage": 1,
+      "row": 1
+    },
+    {
+      "id": "bronce",
+      "type": "database",
+      "label": "Bronce SQL",
+      "sublabel": "Raw y estado",
+      "stage": 2,
+      "row": 1
+    },
+    {
+      "id": "transformar",
+      "type": "backend",
+      "label": "Procesadores",
+      "sublabel": "DQ + dimensiones",
+      "stage": 3,
+      "row": 1
+    },
+    {
+      "id": "silver",
+      "type": "database",
+      "label": "Silver SQL",
+      "sublabel": "Hechos validados",
+      "stage": 4,
+      "row": 1
+    },
+    {
+      "id": "config",
+      "type": "database",
+      "label": "MDM + Config",
+      "sublabel": "Catálogos y reglas",
+      "stage": 2,
+      "row": 0
+    },
+    {
+      "id": "cuarentena",
+      "type": "database",
+      "label": "Cuarentena",
+      "sublabel": "Rechazos y origen",
+      "stage": 3,
+      "row": 2
+    },
+    {
+      "id": "archivo",
+      "type": "external",
+      "label": "Archivados",
+      "sublabel": "Original procesado",
+      "stage": 1,
+      "row": 3
+    },
+    {
+      "id": "gold",
+      "type": "database",
+      "label": "Vistas Gold",
+      "sublabel": "Lectura de Silver",
+      "stage": 4,
+      "row": 3
+    },
+    {
+      "id": "api-lectura",
+      "type": "backend",
+      "label": "API de consulta",
+      "sublabel": "Preview / export",
+      "stage": 3,
+      "row": 3
+    }
+  ],
+  "flows": [
+    {
+      "id": "raw-input",
+      "from": "excel",
+      "to": "ingesta",
+      "label": "datos crudos",
+      "variant": "emphasis"
+    },
+    {
+      "id": "raw-store",
+      "from": "ingesta",
+      "to": "bronce",
+      "label": "filas Raw",
+      "variant": "emphasis"
+    },
+    {
+      "id": "bronze-read",
+      "from": "bronce",
+      "to": "transformar",
+      "label": "filas pendientes",
+      "variant": "emphasis"
+    },
+    {
+      "id": "config-read",
+      "from": "config",
+      "to": "transformar",
+      "label": "IDs y políticas",
+      "variant": "default"
+    },
+    {
+      "id": "write-facts",
+      "from": "transformar",
+      "to": "silver",
+      "label": "payload válido",
+      "variant": "emphasis"
+    },
+    {
+      "id": "write-errors",
+      "from": "transformar",
+      "to": "cuarentena",
+      "label": "filas rechazadas",
+      "variant": "default"
+    },
+    {
+      "id": "archive-input",
+      "from": "ingesta",
+      "to": "archivo",
+      "label": "archivo original",
+      "variant": "default"
+    },
+    {
+      "id": "view-read",
+      "from": "silver",
+      "to": "gold",
+      "label": "hechos SQL",
+      "variant": "default"
+    },
+    {
+      "id": "api-gold",
+      "from": "gold",
+      "to": "api-lectura",
+      "label": "filas SQL",
+      "variant": "default"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Alcance y referencias",
+      "items": [
+        "Abstracción de datos; el control de ejecución está en el otro mapa.",
+        "Fuentes: ETL/bronce/cargador.py, silver/facts/_base_processor.py, pipeline.py y gold/marts.py.",
+        "Los cálculos reciben también parámetros y dimensiones: Bronce no aporta todo lo necesario."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Circuito incompleto",
+      "items": [
+        "Resolver cuarentena guarda Valor_Corregido; reinyectar solo reactiva el estado de Bronce en el recorrido revisado.",
+        "Esa recuperación necesita un contrato durable antes de dibujarla como corrección garantizada.",
+        "Las proyecciones leen Silver directamente y guardan resultados; esa operación se detalla en la propuesta."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Rerun y publicación",
+      "items": [
+        "El reproceso por fact tiene rollback probado en SQL Server.",
+        "El reproceso es secuencial; la carga completa ejecuta facts en paralelo tras poda y campañas.",
+        "Una vista Gold no publica un snapshot independiente del estado de Silver."
+      ]
+    }
+  ]
+}

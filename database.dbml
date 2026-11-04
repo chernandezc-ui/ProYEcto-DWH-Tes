@@ -1,0 +1,1332 @@
+Table "Bronce"."Calibres" {
+  "ID_Calibres" bigint [pk, not null]
+  "Fecha_Raw" nvarchar(50)
+  "Modulo_Raw" nvarchar(50)
+  "Turno_Raw" nvarchar(50)
+  "Variedad_Raw" nvarchar(100)
+  "Evaluador_Raw" nvarchar(150)
+  "Valores_Raw" nvarchar(max)
+  "Nombre_Archivo" nvarchar(255) [not null]
+  "Fecha_Sistema" datetime2 [not null]
+}
+
+Table "Bronce"."Ciclos_Fenologicos" {
+  "ID_Ciclo_Fenologico" bigint [pk, not null]
+  "Fecha_Raw" nvarchar(50)
+  "Modulo_Raw" nvarchar(50)
+  "Turno_Raw" nvarchar(50)
+  "Valvula_Raw" nvarchar(50)
+  "Organo_Raw" nvarchar(50)
+  "Color_Raw" nvarchar(50)
+  "Variedad_Raw" nvarchar(100)
+  "Evaluador_Raw" nvarchar(150)
+  "FechaSubida_Raw" nvarchar(50)
+  "Valores_Raw" nvarchar(max)
+  "Nombre_Archivo" nvarchar(255) [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_Carga" nvarchar(50)
+}
+
+Table "Bronce"."Cierre_Mapas_Cosecha" {
+  "ID_Cierre_Cosecha" bigint [pk, not null]
+  "Fecha_Raw" nvarchar(50)
+  "Modulo_Raw" nvarchar(50)
+  "Variedad_Raw" nvarchar(100)
+  "Valores_Raw" nvarchar(max)
+  "Nombre_Archivo" nvarchar(255) [not null]
+  "Fecha_Sistema" datetime2 [not null]
+}
+
+Table "Bronce"."Consolidado_Tareos" {
+  "ID_Tareo" bigint [pk, not null]
+  "Fecha_Raw" nvarchar(50)
+  "IDPersonalGeneral_Raw" nvarchar(20)
+  "DNIResponsable_Raw" nvarchar(20)
+  "Modulo_Raw" nvarchar(50)
+  "Turno_Raw" nvarchar(50)
+  "Actividad_Raw" nvarchar(150)
+  "Labor_Raw" nvarchar(150)
+  "HorasTrabajadas_Raw" nvarchar(20)
+  "IDPlanilla_Raw" nvarchar(20)
+  "Nombre_Archivo" nvarchar(255) [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_Carga" nvarchar(max)
+  "ID_Consolidado_Tareos" nvarchar(max)
+  "Fundo_Raw" nvarchar(max)
+}
+
+Table "Bronce"."Conteo_Fruta" {
+  "ID_Conteo_Fruta" bigint [pk, not null]
+  "Fecha_Raw" nvarchar(50)
+  "Modulo_Raw" nvarchar(50)
+  "Turno_Raw" nvarchar(50)
+  "Valvula_Raw" nvarchar(50)
+  "Variedad_Raw" nvarchar(100)
+  "Tipo_Evaluacion_Raw" nvarchar(100)
+  "Evaluador_Raw" nvarchar(150)
+  "Valores_Raw" nvarchar(max)
+  "Nombre_Archivo" nvarchar(255) [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_Carga" nvarchar(max)
+  "Fundo_Raw" nvarchar(max)
+  "Sector_Raw" nvarchar(max)
+  "Color_Cinta_Raw" nvarchar(max)
+  "Estado_Raw" nvarchar(max)
+  "Cantidad_Organos_Raw" nvarchar(max)
+  "Fecha_Registro_Raw" nvarchar(50)
+  "Punto_Raw" nvarchar(50)
+  "BotonesFlorales_Raw" nvarchar(50)
+  "Flores_Raw" nvarchar(50)
+  "BayasPequenas_Raw" nvarchar(50)
+  "BayasGrandes_Raw" nvarchar(50)
+  "Fase1_Raw" nvarchar(50)
+  "Fase2_Raw" nvarchar(50)
+  "BayasCremas_Raw" nvarchar(50)
+  "BayasMaduras_Raw" nvarchar(50)
+  "BayasCosechables_Raw" nvarchar(50)
+  "YemasActivadas_Raw" nvarchar(50)
+  "PlantasProductivas_Raw" nvarchar(50)
+  "PlantasNoProductivas_Raw" nvarchar(50)
+  "Muestras_Raw" nvarchar(50)
+  "DNI_Raw" nvarchar(50)
+  "Nombres_Raw" nvarchar(150)
+  "Fecha_Subida_Raw" nvarchar(50)
+}
+
+Table "Bronce"."Dashboard" {
+  "ID_Dashboard" bigint [pk, not null]
+  "Nombre_Archivo" nvarchar(255) [not null]
+  "Ruta_Origen" nvarchar(500)
+  "Fecha_Sistema" datetime2 [not null]
+}
+
+Table "Bronce"."Data_SAP" {
+  "ID_Data_SAP" bigint [pk, not null]
+  "Fecha_Cosecha_Raw" nvarchar(50)
+  "Consumidor_PEP_Raw" nvarchar(100)
+  "Des_Consumidor_PEP_Raw" nvarchar(200)
+  "Variedad_Codigo_Raw" nvarchar(50)
+  "Des_Variedad_Raw" nvarchar(100)
+  "Material_Codigo_Raw" nvarchar(50)
+  "Descripcion_Material_Raw" nvarchar(200)
+  "Codigo_Cliente_Raw" nvarchar(30)
+  "Responsable_Raw" nvarchar(150)
+  "Lote_Raw" nvarchar(50)
+  "Almacen_Raw" nvarchar(50)
+  "Peso_Bruto_Raw" nvarchar(30)
+  "Peso_Tara_Raw" nvarchar(30)
+  "Peso_Neto_Raw" nvarchar(30)
+  "Cantidad_Jabas_Raw" nvarchar(20)
+  "Doc_Remision_Raw" nvarchar(50)
+  "Fecha_Recepcion_Raw" nvarchar(50)
+  "FechaSubida_Raw" nvarchar(50)
+  "Nombre_Archivo" nvarchar(255) [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_Carga" nvarchar(max)
+  "Fecha_Raw" nvarchar(max)
+  "Fundo_Raw" nvarchar(max)
+  "Modulo_Raw" nvarchar(max)
+  "Variedad_Raw" nvarchar(max)
+}
+
+Table "Bronce"."Evaluacion_Calidad_Poda" {
+  "ID_Evaluacion_Poda" bigint [pk, not null]
+  "Fecha_Raw" nvarchar(50)
+  "Modulo_Raw" nvarchar(50)
+  "Turno_Raw" nvarchar(50)
+  "Valvula_Raw" nvarchar(50)
+  "Variedad_Raw" nvarchar(100)
+  "Tipo_Evaluacion_Raw" nvarchar(100)
+  "Evaluador_Raw" nvarchar(150)
+  "Valores_Raw" nvarchar(max)
+  "Nombre_Archivo" nvarchar(255) [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_Carga" nvarchar(max)
+  "ID_Evaluacion_Calidad_Poda" nvarchar(max)
+  "Fundo_Raw" nvarchar(max)
+  "TallosPlanta_Raw" nvarchar(max)
+  "LongitudTallo_Raw" nvarchar(max)
+  "DiametroTallo_Raw" nvarchar(max)
+  "RamillaPlanta_Raw" nvarchar(max)
+  "ToconesPlanta_Raw" nvarchar(max)
+  "CortesDefectuosos_Raw" nvarchar(max)
+  "AlturaPoda_Raw" nvarchar(max)
+}
+
+Table "Bronce"."Evaluacion_Pesos" {
+  "ID_Evaluacion_Pesos" bigint [pk, not null]
+  "Fecha_Raw" nvarchar(50)
+  "Modulo_Raw" nvarchar(50)
+  "Turno_Raw" nvarchar(50)
+  "Valvula_Raw" nvarchar(50)
+  "Variedad_Raw" nvarchar(100)
+  "Evaluacion_Raw" nvarchar(50)
+  "PesoBaya_Raw" nvarchar(20)
+  "CantMuestra_Raw" nvarchar(20)
+  "Nombre_Archivo" nvarchar(255) [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Fecha_de_evaluación_Raw" nvarchar(max)
+  "DNI_Raw" nvarchar(max)
+  "Fecha_de_subida_Raw" nvarchar(max)
+  "Nombres_Raw" nvarchar(max)
+  "N°_cama_Raw" nvarchar(max)
+  "Bayas_pequeñas_Raw" nvarchar(max)
+  "Peso_bayas_pequeñas_Raw" nvarchar(max)
+  "Bayas_grandes_Raw" nvarchar(max)
+  "Peso_bayas_pequeñas.1_Raw" nvarchar(max)
+  "Bayas_fase_1_Raw" nvarchar(max)
+  "Peso_bayas_fase_1_Raw" nvarchar(max)
+  "Bayas_fase_2_Raw" nvarchar(max)
+  "Peso_bayas_fase_2_Raw" nvarchar(max)
+  "Cremas_Raw" nvarchar(max)
+  "Peso_cremas_Raw" nvarchar(max)
+  "Maduras_Raw" nvarchar(max)
+  "Peso_maduras_Raw" nvarchar(max)
+  "Cosechables_Raw" nvarchar(max)
+  "Peso_cosechables_Raw" nvarchar(max)
+  "Estado_Carga" nvarchar(50)
+  "Fundo_Raw" nvarchar(max)
+  "BayasPequenas_Raw" nvarchar(max)
+  "PesoBayasPequenas_Raw" nvarchar(max)
+  "BayasPequenas2_Raw" nvarchar(max)
+  "BayasGrandes_Raw" nvarchar(max)
+  "PesoBayasGrandes_Raw" nvarchar(max)
+  "BayasFase1_Raw" nvarchar(max)
+  "PesoBayasFase1_Raw" nvarchar(max)
+  "BayasFase2_Raw" nvarchar(max)
+  "PesoBayasFase2_Raw" nvarchar(max)
+  "PesoCremas_Raw" nvarchar(max)
+  "PesoMaduras_Raw" nvarchar(max)
+  "PesoCosechables_Raw" nvarchar(max)
+  "Fecha_Subida_Raw" nvarchar(max)
+  "Cama_Raw" nvarchar(max)
+  "PesoBayasPequenas2_Raw" nvarchar(255)
+}
+
+Table "Bronce"."Evaluacion_Vegetativa" {
+  "ID_Evaluacion_Vegetativa" bigint [pk, not null]
+  "Fecha_Raw" nvarchar(100)
+  "DNI_Raw" nvarchar(20)
+  "Fecha_Subida_Raw" nvarchar(100)
+  "Nombres_Raw" nvarchar(200)
+  "Consumidor_Raw" nvarchar(100)
+  "Modulo_Raw" nvarchar(50)
+  "Turno_Raw" nvarchar(50)
+  "Valvula_Raw" nvarchar(50)
+  "Evaluacion_Raw" nvarchar(100)
+  "Cama_Raw" nvarchar(50)
+  "Descripcion_Raw" nvarchar(200)
+  "N_Plantas_Evaluadas_Raw" nvarchar(50)
+  "N_Plantas_en_Floracion_Raw" nvarchar(50)
+  "Valores_Raw" nvarchar(max)
+  "Fecha_Sistema" datetime2 [not null]
+  "Nombre_Archivo" nvarchar(255) [not null]
+  "Estado_Carga" nvarchar(20) [not null]
+}
+
+Table "Bronce"."Fiscalizacion" {
+  "ID_Fiscalizacion" bigint [pk, not null]
+  "Fecha_Raw" nvarchar(50)
+  "DNI_Raw" nvarchar(20)
+  "Modulo_Raw" nvarchar(50)
+  "Turno_Raw" nvarchar(50)
+  "Valores_Raw" nvarchar(max)
+  "Nombre_Archivo" nvarchar(255) [not null]
+  "Fecha_Sistema" datetime2 [not null]
+}
+
+Table "Bronce"."Fisiologia" {
+  "ID_Fisiologia" bigint [pk, not null]
+  "Fecha_Raw" nvarchar(50)
+  "Modulo_Raw" nvarchar(50)
+  "Turno_Raw" nvarchar(50)
+  "Valvula_Raw" nvarchar(50)
+  "Variedad_Raw" nvarchar(100)
+  "Brote_Raw" nvarchar(10)
+  "Tercio_Raw" nvarchar(20)
+  "Hinchadas_Raw" nvarchar(20)
+  "Productivas_Raw" nvarchar(20)
+  "Total_Org_Raw" nvarchar(20)
+  "Nombre_Archivo" nvarchar(255) [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_Carga" nvarchar(max)
+  "Fundo_Raw" nvarchar(max)
+  "BrotesProd_Raw" nvarchar(100)
+  "BrotesVeg_Raw" nvarchar(100)
+  "Evaluador_Raw" nvarchar(200)
+  "Sector_Raw" nvarchar(200)
+}
+
+Table "Bronce"."Induccion_Floral" {
+  "ID_Induccion_Floral" bigint [pk, not null]
+  "Fecha_Raw" nvarchar(50)
+  "Modulo_Raw" nvarchar(50)
+  "Turno_Raw" nvarchar(50)
+  "Valvula_Raw" nvarchar(50)
+  "Variedad_Raw" nvarchar(100)
+  "Tipo_Evaluacion_Raw" nvarchar(100)
+  "Evaluador_Raw" nvarchar(150)
+  "Valores_Raw" nvarchar(max)
+  "Nombre_Archivo" nvarchar(255) [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "DNI_Raw" nvarchar(20)
+  "Fecha_Subida_Raw" nvarchar(50)
+  "Nombres_Raw" nvarchar(200)
+  "Consumidor_Raw" nvarchar(50)
+  "Cama_Raw" nvarchar(50)
+  "Descripcion_Raw" nvarchar(100)
+  "PlantasPorCama_Raw" nvarchar(50)
+  "PlantasConInduccion_Raw" nvarchar(50)
+  "BrotesConInduccion_Raw" nvarchar(50)
+  "BrotesTotales_Raw" nvarchar(50)
+  "BrotesConFlor_Raw" nvarchar(50)
+  "Estado_Carga" nvarchar(20) [not null]
+}
+
+Table "Bronce"."Maduracion" {
+  "ID_Maduracion" bigint [pk, not null]
+  "Fecha_Raw" nvarchar(50)
+  "Modulo_Raw" nvarchar(50)
+  "Turno_Raw" nvarchar(50)
+  "Valvula_Raw" nvarchar(50)
+  "Variedad_Raw" nvarchar(100)
+  "Evaluador_Raw" nvarchar(150)
+  "Valores_Raw" nvarchar(max)
+  "Nombre_Archivo" nvarchar(255) [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_Carga" nvarchar(20) [not null]
+  "Organo_Raw" nvarchar(100)
+  "Color_Raw" nvarchar(100)
+  "Sector_Raw" nvarchar(200)
+}
+
+Table "Bronce"."Peladas" {
+  "ID_Peladas" bigint [pk, not null]
+  "Fecha_Raw" nvarchar(50)
+  "Modulo_Raw" nvarchar(50)
+  "Turno_Raw" nvarchar(50)
+  "Valvula_Raw" nvarchar(50)
+  "Variedad_Raw" nvarchar(100)
+  "Evaluador_Raw" nvarchar(150)
+  "Valores_Raw" nvarchar(max)
+  "Nombre_Archivo" nvarchar(255) [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_Carga" nvarchar(max)
+  "Fundo_Raw" nvarchar(max)
+  "DNI_Raw" nvarchar(max)
+  "Punto_Raw" nvarchar(max)
+  "Muestras_Raw" nvarchar(max)
+  "BotonesFlorales_Raw" nvarchar(max)
+  "Flores_Raw" nvarchar(max)
+  "BayasPequenas_Raw" nvarchar(max)
+  "BayasGrandes_Raw" nvarchar(max)
+  "Fase1_Raw" nvarchar(max)
+  "Fase2_Raw" nvarchar(max)
+  "BayasCremas_Raw" nvarchar(max)
+  "BayasMaduras_Raw" nvarchar(max)
+  "BayasCosechables_Raw" nvarchar(max)
+  "PlantasProductivas_Raw" nvarchar(max)
+  "PlantasNoProductivas_Raw" nvarchar(max)
+  "YemasActivadas_Raw" nvarchar(50)
+  "TotalOrganos_Raw" nvarchar(50)
+  "TotalPlantas_Raw" nvarchar(50)
+  "Nombres_Raw" nvarchar(200)
+}
+
+Table "Bronce"."Pintado_Flores" {
+  "ID_Pintado_Flores" bigint [pk, not null]
+  "Fecha_Raw" nvarchar(50)
+  "Modulo_Raw" nvarchar(50)
+  "Turno_Raw" nvarchar(50)
+  "Valvula_Raw" nvarchar(50)
+  "Variedad_Raw" nvarchar(100)
+  "Evaluador_Raw" nvarchar(150)
+  "Valores_Raw" nvarchar(max)
+  "Nombre_Archivo" nvarchar(255) [not null]
+  "Fecha_Sistema" datetime2 [not null]
+}
+
+Table "Bronce"."Proyeccion_Pesos" {
+  "ID_Proyeccion_Pesos" bigint [pk, not null]
+  "Fecha_Raw" nvarchar(50)
+  "Modulo_Raw" nvarchar(50)
+  "Variedad_Raw" nvarchar(100)
+  "Peso_Proyectado_Raw" nvarchar(20)
+  "Nombre_Archivo" nvarchar(255) [not null]
+  "Fecha_Sistema" datetime2 [not null]
+}
+
+Table "Bronce"."Reporte_Clima" {
+  "ID_Reporte_Clima" bigint [pk, not null]
+  "Fecha_Raw" nvarchar(50)
+  "Hora_Raw" nvarchar(20)
+  "Sector_Raw" nvarchar(50)
+  "TempMax_Raw" nvarchar(20)
+  "TempMin_Raw" nvarchar(20)
+  "Humedad_Raw" nvarchar(20)
+  "Precipitacion_Raw" nvarchar(20)
+  "Valores_Raw" nvarchar(max)
+  "Nombre_Archivo" nvarchar(255) [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_Carga" nvarchar(max)
+}
+
+Table "Bronce"."Reporte_Cosecha" {
+  "ID_Reporte_Cosecha" bigint [pk, not null]
+  "Fecha_Raw" nvarchar(50)
+  "Modulo_Raw" nvarchar(50)
+  "Turno_Raw" nvarchar(50)
+  "Valvula_Raw" nvarchar(50)
+  "Variedad_Raw" nvarchar(100)
+  "KgNeto_Raw" nvarchar(30)
+  "Jabas_Raw" nvarchar(20)
+  "Valores_Raw" nvarchar(max)
+  "Nombre_Archivo" nvarchar(255) [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_Carga" nvarchar(max)
+  "Fundo_Raw" nvarchar(max)
+  "Lote_Raw" nvarchar(max)
+  "Responsable_Raw" nvarchar(max)
+}
+
+Table "Bronce"."Seguimiento_Errores" {
+  "ID_Seguimiento_Errores" bigint [pk, not null]
+  "Fecha_Raw" nvarchar(50)
+  "Modulo_Raw" nvarchar(50)
+  "Evaluador_Raw" nvarchar(150)
+  "Tipo_Error_Raw" nvarchar(150)
+  "Valores_Raw" nvarchar(max)
+  "Nombre_Archivo" nvarchar(255) [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_Carga" nvarchar(max)
+  "Fundo_Raw" nvarchar(max)
+  "Variedad_Raw" nvarchar(max)
+  "Plantas_Vivas_Raw" nvarchar(max)
+  "Plantas_Muertas_Raw" nvarchar(max)
+  "Total_Plantas_Raw" nvarchar(max)
+}
+
+Table "Bronce"."Tasa_Crecimiento_Brotes" {
+  "ID_Tasa_Crecimiento" bigint [pk, not null]
+  "Fecha_Raw" nvarchar(50)
+  "Modulo_Raw" nvarchar(50)
+  "Turno_Raw" nvarchar(50)
+  "Valvula_Raw" nvarchar(50)
+  "Variedad_Raw" nvarchar(100)
+  "Evaluador_Raw" nvarchar(150)
+  "Valores_Raw" nvarchar(max)
+  "Nombre_Archivo" nvarchar(255) [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Codigo_Origen_Raw" nvarchar(100)
+  "Semana_Raw" nvarchar(20)
+  "Dia_Raw" nvarchar(20)
+  "DNI_Raw" nvarchar(20)
+  "Condicion_Raw" nvarchar(100)
+  "Estado_Vegetativo_Raw" nvarchar(100)
+  "Cama_Raw" nvarchar(50)
+  "Tipo_Tallo_Raw" nvarchar(50)
+  "Ensayo_Raw" nvarchar(50)
+  "Medida_Raw" nvarchar(50)
+  "Fecha_Poda_Aux_Raw" nvarchar(50)
+  "Campana_Raw" nvarchar(30)
+  "Observacion_Raw" nvarchar(500)
+  "Tipo_Evaluacion_Raw" nvarchar(100)
+  "Estado_Carga" nvarchar(20) [not null]
+}
+
+Table "Bronce"."Variables_Meteorologicas" {
+  "ID_Variables_Met" bigint [pk, not null]
+  "Fecha_Raw" nvarchar(50)
+  "Modulo_Raw" nvarchar(50)
+  "VPD_Raw" nvarchar(20)
+  "Radiacion_Raw" nvarchar(20)
+  "Valores_Raw" nvarchar(max)
+  "Nombre_Archivo" nvarchar(255) [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_Carga" nvarchar(max)
+  "ID_Variables_Meteorologicas" nvarchar(max)
+  "Sector_Raw" nvarchar(max)
+  "TempMax_Raw" nvarchar(max)
+  "TempMin_Raw" nvarchar(max)
+  "Humedad_Raw" nvarchar(max)
+}
+
+Table "Control"."Bloqueo_Ejecucion" {
+  "ID_Lock" int [pk, not null]
+  "ID_Corrida_Activa" varchar(36)
+  "Adquirido_Por" varchar(100)
+  "Fecha_Adquisicion" datetime2
+  "Heartbeat" datetime2
+}
+
+Table "Control"."Comando_Ejecucion" {
+  "ID_Comando" int [pk, not null]
+  "ID_Corrida" varchar(36) [not null]
+  "Tipo_Comando" varchar(50) [not null]
+  "Iniciado_Por" varchar(100) [not null]
+  "Comentario" varchar(500)
+  "Max_Reintentos" int [not null]
+  "Timeout_Seg" int [not null]
+  "Estado_Cmd" varchar(20) [not null]
+  "Fecha_Comando" datetime2 [not null]
+  "Fecha_Proceso" datetime2
+  "Mensaje_Error" varchar(500)
+}
+
+Table "Control"."Corrida" {
+  "ID_Corrida" varchar(36) [pk, not null]
+  "Iniciado_Por" varchar(100) [not null]
+  "Comentario" varchar(500)
+  "Estado" varchar(20) [not null]
+  "Intento_Numero" int [not null]
+  "Max_Reintentos" int [not null]
+  "Fecha_Solicitud" datetime2 [not null]
+  "Fecha_Inicio" datetime2
+  "Fecha_Fin" datetime2
+  "PID_Runner" int
+  "Heartbeat_Ultimo" datetime2
+  "Timeout_Segundos" int [not null]
+  "Mensaje_Final" varchar(1000)
+  "ID_Log_Auditoria" int
+}
+
+Table "Control"."Corrida_Evento" {
+  "ID_Evento" bigint [pk, not null]
+  "ID_Corrida" varchar(36) [not null]
+  "Tipo" varchar(20) [not null]
+  "Mensaje" varchar(4000) [not null]
+  "Fecha_Evento" datetime2 [not null]
+}
+
+Table "Control"."Corrida_Paso" {
+  "ID_Paso" int [pk, not null]
+  "ID_Corrida" varchar(36) [not null]
+  "Nombre_Paso" varchar(100) [not null]
+  "Orden" int [not null]
+  "Estado" varchar(20) [not null]
+  "Fecha_Inicio" datetime2
+  "Fecha_Fin" datetime2
+  "Mensaje_Error" varchar(1000)
+}
+
+Table "dbo"."sysdiagrams" {
+  "name" nvarchar(128) [not null]
+  "principal_id" int [not null]
+  "diagram_id" int [pk, not null]
+  "version" int
+  "definition" varbinary(max)
+}
+
+Table "Gold"."Mart_Administrativo" {
+  "ID_Mart_Admin" bigint [pk, not null]
+  "Semana_ISO" int [not null]
+  "DNI_Personal" nvarchar(20) [not null]
+  "Nombre_Personal" nvarchar(200) [not null]
+  "Sexo" nvarchar(10)
+  "Rol" nvarchar(100)
+  "Actividad" nvarchar(150)
+  "Labor" nvarchar(150)
+  "Horas_Trabajadas" decimal
+  "Dias_Trabajados" int
+  "Pct_Asertividad" decimal
+  "Registros_Observados_SAP" int
+  "Supervisor" nvarchar(200)
+  "Fecha_Actualizacion" datetime2 [not null]
+  "ID_Tiempo" int
+  "ID_Personal" int
+  "ID_Actividad" int
+  "Horas_Trabajadas_Total" decimal
+  "ID_Campana" int
+}
+
+Table "Gold"."Mart_Ciclo_Poda" {
+  "ID_Mart_Poda" bigint [pk, not null]
+  "ID_Tiempo" int [not null]
+  "ID_Geografia" int [not null]
+  "ID_Variedad" int [not null]
+  "ID_Campana" int [not null]
+  "Fundo" nvarchar(max)
+  "Modulo" int
+  "Variedad" nvarchar(100)
+  "Semana_ISO" int
+  "Tipo_Evaluacion" nvarchar(100)
+  "Tallos_Planta_Total" decimal
+  "Longitud_Tallo_Total" decimal
+  "Diametro_Tallo_Total" decimal
+  "Ramilla_Planta_Total" decimal
+  "Tocones_Planta_Total" decimal
+  "Cortes_Defectuosos_Total" decimal
+  "Altura_Poda_Total" decimal
+  "Fecha_Actualizacion" datetime2
+  "N_Muestras" int [not null]
+}
+
+Table "Gold"."Mart_Clima" {
+  "ID_Tiempo" int [not null]
+  "Sector_Climatico" nvarchar(50) [not null]
+  "Semana_ISO" int [not null]
+  "Temp_Max_Promedio" decimal
+  "Temp_Min_Promedio" decimal
+  "VPD_Promedio" decimal
+  "Humedad_Promedio" decimal
+  "Precipitacion_Total" decimal
+  "ID_Campana" int
+}
+
+Table "Gold"."Mart_Cosecha" {
+  "ID_Mart_Cosecha" bigint [pk, not null]
+  "Semana_ISO" int [not null]
+  "Fecha_Cosecha" date [not null]
+  "Modulo" int
+  "Turno" int
+  "Variedad" nvarchar(100) [not null]
+  "Condicion" nvarchar(50)
+  "Kg_Neto_Real" decimal
+  "Kg_Proyectados" decimal
+  "Pct_Cumplimiento" decimal
+  "Cantidad_Jabas" int
+  "Peso_Promedio_Jaba_kg" decimal
+  "Fecha_Actualizacion" datetime2 [not null]
+  "ID_Tiempo" int
+  "ID_Geografia" int
+  "ID_Variedad" int
+  "Fundo" nvarchar(max)
+  "Fecha_Evento" nvarchar(max)
+  "Kg_Brutos" decimal
+  "Kg_Neto_MP" decimal
+  "Kg_Proyectado" decimal
+  "ID_Campana" int
+}
+
+Table "Gold"."Mart_Evaluacion_Vegetativa" {
+  "ID_Mart_Vegetativa" bigint [pk, not null]
+  "ID_Tiempo" int [not null]
+  "ID_Geografia" int [not null]
+  "ID_Variedad" int [not null]
+  "ID_Campana" int [not null]
+  "Fundo" nvarchar(max)
+  "Modulo" int
+  "Variedad" nvarchar(100)
+  "Semana_ISO" int
+  "Tipo_Evaluacion" nvarchar(100)
+  "Plantas_Evaluadas_Total" int
+  "Plantas_En_Floracion_Total" int
+  "Pct_Floracion_Promedio" decimal
+  "Fecha_Actualizacion" datetime2
+}
+
+Table "Gold"."Mart_Fenologia" {
+  "ID_Mart_Fenologia" bigint [pk, not null]
+  "Semana_ISO" int [not null]
+  "Modulo" int
+  "Variedad" nvarchar(100) [not null]
+  "Color_Cinta" nvarchar(50)
+  "Estado_Fenologico" nvarchar(100) [not null]
+  "Orden_Estado" int [not null]
+  "Cantidad_Bayas" int
+  "Pct_Cosechable" decimal
+  "Pct_Avance_Ciclo" decimal
+  "Brotes_Productivos" int
+  "Brotes_Vegetativos" int
+  "Ratio_Productivo_Veg" decimal
+  "Fecha_Actualizacion" datetime2 [not null]
+  "ID_Tiempo" int
+  "ID_Geografia" int
+  "ID_Variedad" int
+  "Fundo" nvarchar(max)
+  "Cantidad_Organos" int
+  "ID_Campana" int
+}
+
+Table "Gold"."Mart_Fisiologia" {
+  "ID_Mart_Fisiologia" bigint [pk, not null]
+  "ID_Tiempo" int [not null]
+  "ID_Geografia" int [not null]
+  "ID_Variedad" int [not null]
+  "ID_Campana" int [not null]
+  "Fundo" nvarchar(max)
+  "Modulo" int
+  "Variedad" nvarchar(100)
+  "Semana_ISO" int
+  "Tercio" nvarchar(20)
+  "Brotes_Productivos_Promedio" decimal
+  "Brotes_Vegetativos_Promedio" decimal
+  "Hinchadas_Promedio" decimal
+  "Productivas_Promedio" decimal
+  "Total_Organos_Promedio" decimal
+  "Ratio_Productivo_Veg" decimal
+  "Fecha_Actualizacion" datetime2
+}
+
+Table "Gold"."Mart_Induccion_Floral" {
+  "ID_Mart_Induccion" bigint [pk, not null]
+  "ID_Tiempo" int [not null]
+  "ID_Geografia" int [not null]
+  "ID_Variedad" int [not null]
+  "ID_Campana" int [not null]
+  "Fundo" nvarchar(max)
+  "Modulo" int
+  "Variedad" nvarchar(100)
+  "Semana_ISO" int
+  "Tipo_Evaluacion" nvarchar(100)
+  "Pct_Plantas_Con_Induccion_Prom" decimal
+  "Pct_Brotes_Con_Induccion_Prom" decimal
+  "Pct_Brotes_Con_Flor_Prom" decimal
+  "Brotes_Totales" int
+  "Brotes_Con_Flor" int
+  "Fecha_Actualizacion" datetime2
+}
+
+Table "Gold"."Mart_Maduracion" {
+  "ID_Mart_Maduracion" bigint [pk, not null]
+  "ID_Tiempo" int [not null]
+  "ID_Geografia" int [not null]
+  "ID_Variedad" int [not null]
+  "ID_Campana" int [not null]
+  "Fundo" nvarchar(max)
+  "Modulo" int
+  "Variedad" nvarchar(100)
+  "Semana_ISO" int
+  "ID_Estado_Fenologico" int
+  "Estado_Fenologico" nvarchar(100)
+  "ID_Cinta" int
+  "Color_Cinta" nvarchar(50)
+  "Organos_Observados" int
+  "Dias_Pasados_Promedio" decimal
+  "Fecha_Actualizacion" datetime2
+}
+
+Table "Gold"."Mart_Peladas" {
+  "ID_Mart_Peladas" bigint [pk, not null]
+  "ID_Tiempo" int [not null]
+  "ID_Geografia" int [not null]
+  "ID_Variedad" int [not null]
+  "ID_Campana" int [not null]
+  "Fundo" nvarchar(max)
+  "Modulo" int
+  "Variedad" nvarchar(100)
+  "Semana_ISO" int
+  "Botones_Florales_Total" int
+  "Flores_Total" int
+  "Bayas_Pequenas_Total" int
+  "Bayas_Grandes_Total" int
+  "Fase_1_Total" int
+  "Fase_2_Total" int
+  "Bayas_Cremas_Total" int
+  "Bayas_Maduras_Total" int
+  "Bayas_Cosechables_Total" int
+  "Pct_Cosechable" decimal
+  "Plantas_Productivas_Total" int
+  "Plantas_No_Productivas_Total" int
+  "Muestras_Total" int
+  "Fecha_Actualizacion" datetime2
+}
+
+Table "Gold"."Mart_Pesos_Calibres" {
+  "ID_Mart_Pesos" bigint [pk, not null]
+  "Semana_ISO" int [not null]
+  "Modulo" int
+  "Variedad" nvarchar(100) [not null]
+  "Evaluador" nvarchar(200)
+  "Cant_Bayas_Muestra" int
+  "Peso_Promedio_Baya_g" decimal
+  "Peso_Proyectado_Baya_g" decimal
+  "Tendencia_Peso" decimal
+  "Estado_DQ" nvarchar(20)
+  "Fecha_Actualizacion" datetime2 [not null]
+  "ID_Tiempo" int
+  "ID_Geografia" int
+  "ID_Variedad" int
+  "Fundo" nvarchar(max)
+  "ID_Campana" int
+}
+
+Table "Gold"."Mart_Proyecciones" {
+  "ID_Mart_Proyeccion" bigint [pk, not null]
+  "Semana_Objetivo" int [not null]
+  "Modulo" int
+  "Turno" int
+  "Variedad" nvarchar(100) [not null]
+  "Version_Escenario" nvarchar(50) [not null]
+  "Fecha_Generacion" date [not null]
+  "Fecha_Cutoff" datetime2 [not null]
+  "Kg_Proyectados" decimal [not null]
+  "Kg_Real" decimal
+  "Error_MAPE" decimal
+  "Desviacion_kg" decimal
+  "Flag_Override" bit [not null]
+  "Motivo_Override" nvarchar(500)
+  "Fecha_Actualizacion" datetime2 [not null]
+  "ID_Tiempo" int
+  "ID_Geografia" int
+  "ID_Variedad" int
+  "ID_Escenario" int
+  "Fundo" nvarchar(max)
+  "MAPE" nvarchar(max)
+  "Version_Modelo" nvarchar(max)
+  "Estado_Workflow" nvarchar(max)
+  "ID_Campana" int
+}
+
+Table "Gold"."Mart_Tasa_Crecimiento" {
+  "ID_Mart_Crecimiento" bigint [pk, not null]
+  "ID_Tiempo" int [not null]
+  "ID_Geografia" int [not null]
+  "ID_Variedad" int [not null]
+  "ID_Campana" int [not null]
+  "Fundo" nvarchar(max)
+  "Modulo" int
+  "Variedad" nvarchar(100)
+  "Semana_ISO" int
+  "Tipo_Evaluacion" nvarchar(100)
+  "Estado_Vegetativo" nvarchar(100)
+  "Tipo_Tallo" nvarchar(50)
+  "Medida_Crecimiento_Promedio" decimal
+  "Medida_Crecimiento_Max" decimal
+  "Dias_Desde_Poda_Promedio" decimal
+  "Cantidad_Mediciones" int
+  "Fecha_Actualizacion" datetime2
+}
+
+Table "Silver"."Bridge_Geografia_Cama" {
+  "ID_Bridge_Geografia_Cama" bigint [pk, not null]
+  "ID_Geografia" int [not null]
+  "ID_Cama_Catalogo" int [not null]
+  "Fecha_Inicio_Vigencia" date [not null]
+  "Fecha_Fin_Vigencia" date
+  "Es_Vigente" bit [not null]
+  "Fuente_Registro" nvarchar(50) [not null]
+  "Observacion" nvarchar(300)
+}
+
+Table "Silver"."Bridge_Modulo_Campana" {
+  "ID_Bridge" int [pk, not null]
+  "ID_Modulo_Catalogo" int [not null]
+  "ID_Variedad" int [not null]
+  "ID_Campana" int [not null]
+  "ID_Condicion" int
+  "Tipo_Campana" nvarchar(50) [not null]
+  "Fecha_Inicio" date [not null]
+  "Fecha_Fin" date
+  "Es_Activa" bit [not null]
+  "Fecha_Creacion" datetime2
+  "Semana_Poda_ISO" int
+  "Anio_Poda_ISO" int
+}
+
+Table "Silver"."Dim_Actividad_Operativa" {
+  "ID_Actividad" int [pk, not null]
+  "ID_SAP" nvarchar(50)
+  "Nombre_Actividad" nvarchar(150) [not null]
+  "ID_Labor" nvarchar(50)
+  "Nombre_Labor" nvarchar(150)
+  "Categoria" nvarchar(100)
+}
+
+Table "Silver"."Dim_Cama_Catalogo" {
+  "ID_Cama_Catalogo" int [pk, not null]
+  "Cama_Normalizada" nvarchar(50) [not null]
+  "Es_Activa" bit [not null]
+  "Fecha_Creacion" datetime2 [not null]
+  "Fecha_Modificacion" datetime2
+}
+
+Table "Silver"."Dim_Campana" {
+  "ID_Campana" int [pk, not null]
+  "Anio_Cosecha" int [not null]
+  "Nombre_Campana" nvarchar(100) [not null]
+  "Estado" nvarchar(50) [not null]
+  "Es_Activa" bit [not null]
+  "Fecha_Creacion" datetime2
+}
+
+Table "Silver"."Dim_Cinta" {
+  "ID_Cinta" int [pk, not null]
+  "Color_Cinta" nvarchar(50) [not null]
+  "Descripcion" nvarchar(200)
+}
+
+Table "Silver"."Dim_Condicion_Cultivo" {
+  "ID_Condicion" int [pk, not null]
+  "Sustrato" nvarchar(100) [not null]
+  "Certificacion" nvarchar(50) [not null]
+}
+
+Table "Silver"."Dim_Escenario_Proyeccion" {
+  "ID_Escenario" int [pk, not null]
+  "Tipo_Escenario" nvarchar(50) [not null]
+  "Descripcion" nvarchar(200)
+  "Horizonte_Semanas" int
+  "Frecuencia_Actualizacion" nvarchar(50)
+}
+
+Table "Silver"."Dim_Estado_Fenologico" {
+  "ID_Estado_Fenologico" int [pk, not null]
+  "Nombre_Estado" nvarchar(100) [not null]
+  "Orden_Estado" int [not null]
+}
+
+Table "Silver"."Dim_Estado_Workflow" {
+  "ID_Workflow" int [pk, not null]
+  "Estado" nvarchar(50) [not null]
+  "Descripcion" nvarchar(200)
+}
+
+Table "Silver"."Dim_Fundo_Catalogo" {
+  "ID_Fundo_Catalogo" int [pk, not null]
+  "Fundo" nvarchar(100) [not null]
+  "Es_Activa" bit [not null]
+  "Fecha_Creacion" datetime2
+  "Fecha_Modificacion" datetime2
+}
+
+Table "Silver"."Dim_Geografia" {
+  "ID_Geografia" int [pk, not null]
+  "ID_Fundo_Catalogo" int [not null]
+  "ID_Sector_Catalogo" int [not null]
+  "ID_Modulo_Catalogo" int [not null]
+  "ID_Turno_Catalogo" int [not null]
+  "ID_Valvula_Catalogo" int [not null]
+  "ID_Cama_Catalogo" int [not null]
+  "Es_Test_Block" bit [not null]
+  "Codigo_SAP_Campo" nvarchar(50)
+  "Nivel_Granularidad" varchar(50) [not null]
+  "Fecha_Inicio_Vigencia" date [not null]
+  "Fecha_Fin_Vigencia" date
+  "Es_Vigente" bit [not null]
+}
+
+Table "Silver"."Dim_Modulo_Catalogo" {
+  "ID_Modulo_Catalogo" int [pk, not null]
+  "Modulo" int [not null]
+  "SubModulo" int
+  "Tipo_Conduccion" nvarchar(50)
+  "Es_Activa" bit [not null]
+  "Fecha_Creacion" datetime2
+  "Fecha_Modificacion" datetime2
+}
+
+Table "Silver"."Dim_Personal" {
+  "ID_Personal" int [pk, not null]
+  "DNI" nvarchar(20) [not null]
+  "Nombre_Completo" nvarchar(200) [not null]
+  "Rol" nvarchar(100)
+  "Sexo" nvarchar(10)
+  "ID_Planilla" nvarchar(20)
+  "Pct_Asertividad" decimal
+  "Dias_Ausentismo" int
+}
+
+Table "Silver"."Dim_Sector_Catalogo" {
+  "ID_Sector_Catalogo" int [pk, not null]
+  "Sector" nvarchar(100) [not null]
+  "Es_Activa" bit [not null]
+  "Fecha_Creacion" datetime2
+  "Fecha_Modificacion" datetime2
+}
+
+Table "Silver"."Dim_Tiempo" {
+  "ID_Tiempo" int [pk, not null]
+  "Fecha" date [not null]
+  "Anio" int [not null]
+  "Mes" int [not null]
+  "Semana_ISO" int [not null]
+  "Semana_Cosecha" int
+  "Dia_Semana" int [not null]
+  "Nombre_Mes" nvarchar(20) [not null]
+  "Es_Fin_Semana" bit [not null]
+}
+
+Table "Silver"."Dim_Turno_Catalogo" {
+  "ID_Turno_Catalogo" int [pk, not null]
+  "Turno" int [not null]
+  "Es_Activa" bit [not null]
+  "Fecha_Creacion" datetime2
+  "Fecha_Modificacion" datetime2
+}
+
+Table "Silver"."Dim_Valvula_Catalogo" {
+  "ID_Valvula_Catalogo" int [pk, not null]
+  "Valvula" nvarchar(50) [not null]
+  "Es_Activa" bit [not null]
+  "Fecha_Creacion" datetime2
+  "Fecha_Modificacion" datetime2
+}
+
+Table "Silver"."Dim_Variedad" {
+  "ID_Variedad" int [pk, not null]
+  "Nombre_Variedad" nvarchar(100) [not null]
+  "Breeder" nvarchar(100)
+  "Es_Activa" bit [not null]
+  "Fecha_Creacion" datetime2 [not null]
+  "Fecha_Modificacion" datetime2
+}
+
+Table "Silver"."Fact_areas_plantas" {
+  "ID_Censo" int [pk, not null]
+  "ID_Geografia" int [not null]
+  "ID_Variedad" int [not null]
+  "ID_Tiempo" int [not null]
+  "Cantidad_Plantas" float
+  "Area_ha" float
+  "Fecha_Sistema" datetime2
+  "Estado_DQ" nvarchar(50)
+  "ID_Campana" int
+  "ID_Condicion" int
+}
+
+Table "Silver"."Fact_Censo_Plantas" {
+  "ID_Censo" bigint [pk, not null]
+  "ID_Geografia" int [not null]
+  "ID_Tiempo" int [not null]
+  "ID_Variedad" int [not null]
+  "Fecha_Evento" datetime2 [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "ID_Campana" int
+  "Plantas_Buenas" int
+  "Plantas_Regulares" int
+  "Plantas_Malas" int
+}
+
+Table "Silver"."Fact_Ciclo_Poda" {
+  "ID_Poda" bigint [pk, not null]
+  "ID_Geografia" int [not null]
+  "ID_Tiempo" int [not null]
+  "ID_Variedad" int [not null]
+  "Tipo_Evaluacion" nvarchar(100)
+  "Tallos_Planta" decimal
+  "Longitud_Tallo" decimal
+  "Diametro_Tallo" decimal
+  "Ramilla_Planta" decimal
+  "Tocones_Planta" decimal
+  "Cortes_Defectuosos" decimal
+  "Altura_Poda" decimal
+  "Fecha_Evento" datetime2 [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_DQ" nvarchar(20) [not null]
+  "ID_Campana" int
+  "Punto" int
+}
+
+Table "Silver"."Fact_Conteo_Fenologico" {
+  "ID_Conteo_Fenologico" bigint [pk, not null]
+  "ID_Geografia" int [not null]
+  "ID_Tiempo" int [not null]
+  "ID_Variedad" int [not null]
+  "ID_Personal" int
+  "ID_Estado_Fenologico" int [not null]
+  "Cantidad_Organos" int [not null]
+  "Fecha_Evento" datetime2 [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_DQ" nvarchar(20) [not null]
+  "Punto" int
+  "ID_Campana" int
+  "Fecha_Registro" datetime2
+}
+
+Table "Silver"."Fact_Cosecha_SAP" {
+  "ID_Cosecha_SAP" bigint [pk, not null]
+  "ID_Geografia" int [not null]
+  "ID_Tiempo" int [not null]
+  "ID_Variedad" int [not null]
+  "ID_Condicion_Cultivo" int [not null]
+  "Kg_Brutos" decimal
+  "Kg_Neto_MP" decimal
+  "Cantidad_Jabas" int
+  "Lote" nvarchar(50)
+  "Almacen" nvarchar(50)
+  "Doc_Remision" nvarchar(50)
+  "Codigo_Cliente" nvarchar(30)
+  "Responsable" nvarchar(150)
+  "Descripcion_Material" nvarchar(200)
+  "Codigo_SAP_Material" nvarchar(50)
+  "Fecha_Recepcion" datetime2
+  "Fecha_Evento" datetime2 [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_DQ" nvarchar(20) [not null]
+  "ID_Campana" int
+}
+
+Table "Silver"."Fact_Evaluacion_Pesos" {
+  "ID_Evaluacion_Pesos" bigint [pk, not null]
+  "ID_Geografia" int [not null]
+  "ID_Tiempo" int [not null]
+  "ID_Variedad" int [not null]
+  "ID_Personal" int [not null]
+  "Peso_Promedio_Baya_g" decimal [not null]
+  "Cantidad_Bayas_Muestra" int
+  "Peso_Proyectado_Baya_g" decimal
+  "Fecha_Evento" datetime2 [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_DQ" nvarchar(20) [not null]
+  "ID_Campana" int
+}
+
+Table "Silver"."Fact_Floracion" {
+  "ID_Fact_Floracion" bigint [pk, not null]
+  "ID_Geografia" int [not null]
+  "ID_Tiempo" int [not null]
+  "ID_Variedad" int [not null]
+  "ID_Personal" int [not null]
+  "Tipo_Evaluacion" nvarchar(100)
+  "Cantidad_Plantas_Evaluadas" int [not null]
+  "Cantidad_Plantas_en_Floracion" int [not null]
+  "Fecha_Evento" date [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_DQ" nvarchar(20) [not null]
+  "ID_Campana" int
+}
+
+Table "Silver"."Fact_Evaluacion_Vegetativa" {
+  "ID_Fact_Evaluacion_Vegetativa" bigint [pk, not null]
+  "ID_Geografia" int [not null]
+  "ID_Tiempo" int [not null]
+  "ID_Variedad" int [not null]
+  "Semanas_Despues_Poda" int
+  "Promedio_Altura" decimal
+  "Promedio_Tallos_Basales" decimal
+  "Promedio_Tallos_Basales_Nuevos" decimal
+  "Promedio_Brotes_Generales" decimal
+  "Promedio_Brotes_Productivos" decimal
+  "Promedio_Diametro_Brote" decimal
+  "Fecha_Evento" datetime2 [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_DQ" nvarchar(20) [not null]
+  "ID_Campana" int
+}
+
+Table "Silver"."Fact_Fisiologia" {
+  "ID_Fisiologia" bigint [pk, not null]
+  "ID_Geografia" int [not null]
+  "ID_Tiempo" int [not null]
+  "ID_Variedad" int [not null]
+  "Tercio" nvarchar(20)
+  "Brotes_Productivos" int
+  "Brotes_Vegetativos" int
+  "Hinchadas" int
+  "Productivas" int
+  "Total_Organos" int
+  "Aux" nvarchar(255)
+  "Fecha_Evento" datetime2 [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_DQ" nvarchar(20) [not null]
+  "ID_Campana" int
+}
+
+Table "Silver"."Fact_Induccion_Floral" {
+  "ID_Induccion_Floral" bigint [pk, not null]
+  "ID_Geografia" int [not null]
+  "ID_Tiempo" int [not null]
+  "ID_Variedad" int [not null]
+  "ID_Personal" int [not null]
+  "Tipo_Evaluacion" nvarchar(100)
+  "Codigo_Consumidor" nvarchar(50)
+  "Cantidad_Plantas_Por_Cama" int [not null]
+  "Cantidad_Plantas_Con_Induccion" int [not null]
+  "Cantidad_Brotes_Con_Induccion" int [not null]
+  "Cantidad_Brotes_Totales" int [not null]
+  "Cantidad_Brotes_Con_Flor" int [not null]
+  "Pct_Plantas_Con_Induccion" decimal
+  "Pct_Brotes_Con_Induccion" decimal
+  "Pct_Brotes_Con_Flor" decimal
+  "Fecha_Evento" date [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_DQ" nvarchar(20) [not null]
+  "ID_Campana" int
+}
+
+Table "Silver"."Fact_Maduracion" {
+  "ID_Maduracion" bigint [pk, not null]
+  "ID_Personal" int
+  "ID_Geografia" int [not null]
+  "ID_Tiempo" int [not null]
+  "ID_Variedad" int [not null]
+  "ID_Estado_Fenologico" int [not null]
+  "ID_Cinta" int [not null]
+  "ID_Organo" int [not null]
+  "Dias_Pasados_Del_Marcado" int
+  "Fecha_Evento" datetime2 [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_DQ" nvarchar(20) [not null]
+  "ID_Campana" int
+}
+
+Table "Silver"."Fact_Peladas" {
+  "ID_Peladas" bigint [pk, not null]
+  "ID_Geografia" int [not null]
+  "ID_Tiempo" int [not null]
+  "ID_Variedad" int [not null]
+  "ID_Personal" int
+  "Punto" int [not null]
+  "Botones_Florales" int [not null]
+  "Flores" int [not null]
+  "Bayas_Pequenas" int [not null]
+  "Bayas_Grandes" int [not null]
+  "Fase_1" int [not null]
+  "Fase_2" int [not null]
+  "Bayas_Cremas" int [not null]
+  "Bayas_Maduras" int [not null]
+  "Bayas_Cosechables" int [not null]
+  "Yemas_Activadas" int [not null, default: 0]
+  "Plantas_Productivas" int [not null]
+  "Plantas_No_Productivas" int [not null]
+  "Muestras" int [not null]
+  "Fecha_Evento" datetime2 [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_DQ" nvarchar(20) [not null]
+  "ID_Campana" int
+}
+
+Table "Silver"."Fact_Proyecciones" {
+  "ID_Proyeccion" bigint [pk, not null]
+  "ID_Geografia" int [not null]
+  "ID_Tiempo" int [not null]
+  "ID_Variedad" int [not null]
+  "ID_Escenario" int [not null]
+  "ID_Estado_Workflow" int [not null]
+  "Kg_Proyectados" decimal [not null]
+  "MAPE" decimal
+  "Version_Modelo" nvarchar(50)
+  "Fecha_Cutoff" datetime2 [not null]
+  "ID_Version_Datos" nvarchar(100)
+  "Flag_Override" bit [not null]
+  "Motivo_Override" nvarchar(500)
+  "Fecha_Evento" datetime2 [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_DQ" nvarchar(20) [not null]
+  "ID_Campana" int
+  "Kg_Pesimista" decimal
+  "Kg_Optimista" decimal
+  "Pct_Maduracion" decimal
+  "Pct_Productivas" decimal
+}
+
+Table "Silver"."Fact_Tareo" {
+  "ID_Tareo" bigint [pk, not null]
+  "ID_Geografia" int [not null]
+  "ID_Tiempo" int [not null]
+  "ID_Personal" int [not null]
+  "ID_Actividad_Operativa" int [not null]
+  "ID_Personal_Supervisor" int
+  "Horas_Trabajadas" decimal [not null]
+  "ID_Planilla" nvarchar(20)
+  "Es_Observado_SAP" bit [not null]
+  "Fecha_Evento" datetime2 [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "ID_Campana" int
+}
+
+Table "Silver"."Fact_Tasa_Crecimiento_Brotes" {
+  "ID_Tasa_Crecimiento_Brotes" bigint [pk, not null]
+  "ID_Geografia" int [not null]
+  "ID_Cama_Catalogo" int
+  "ID_Tiempo" int [not null]
+  "ID_Variedad" int [not null]
+  "ID_Personal" int [not null]
+  "ID_Condicion" int
+  "Tipo_Evaluacion" nvarchar(100)
+  "Estado_Vegetativo" nvarchar(100)
+  "Tipo_Tallo" nvarchar(50)
+  "Codigo_Ensayo" nvarchar(50) [not null]
+  "Codigo_Origen" nvarchar(100)
+  "Observacion" nvarchar(500)
+  "Fecha_Poda_Aux" date
+  "Dias_Desde_Poda" int
+  "Medida_Crecimiento" decimal [not null]
+  "Fecha_Evento" date [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "Estado_DQ" nvarchar(20) [not null]
+  "ID_Campana" int
+}
+
+Table "Silver"."Fact_Telemetria_Clima" {
+  "ID_Telemetria_Clima" bigint [pk, not null]
+  "ID_Tiempo" int [not null]
+  "Sector_Climatico" nvarchar(50) [not null]
+  "Temperatura_Max_C" decimal
+  "Temperatura_Min_C" decimal
+  "Humedad_Relativa_Pct" decimal
+  "Precipitacion_mm" decimal
+  "VPD" decimal
+  "Radiacion_Solar" decimal
+  "Fecha_Evento" datetime2 [not null]
+  "Fecha_Sistema" datetime2 [not null]
+  "ID_Campana" int
+}
+
+Ref: "Silver"."Fact_Maduracion"."ID_Tiempo" > "Silver"."Dim_Tiempo"."ID_Tiempo"
+Ref: "Silver"."Fact_Telemetria_Clima"."ID_Tiempo" > "Silver"."Dim_Tiempo"."ID_Tiempo"
+Ref: "Silver"."Fact_Cosecha_SAP"."ID_Tiempo" > "Silver"."Dim_Tiempo"."ID_Tiempo"
+Ref: "Silver"."Fact_Conteo_Fenologico"."ID_Tiempo" > "Silver"."Dim_Tiempo"."ID_Tiempo"
+Ref: "Silver"."Fact_Induccion_Floral"."ID_Tiempo" > "Silver"."Dim_Tiempo"."ID_Tiempo"
+Ref: "Silver"."Fact_Proyecciones"."ID_Tiempo" > "Silver"."Dim_Tiempo"."ID_Tiempo"
+Ref: "Silver"."Fact_Tasa_Crecimiento_Brotes"."ID_Tiempo" > "Silver"."Dim_Tiempo"."ID_Tiempo"
+Ref: "Silver"."Fact_Censo_Plantas"."ID_Tiempo" > "Silver"."Dim_Tiempo"."ID_Tiempo"
+Ref: "Silver"."Fact_Evaluacion_Pesos"."ID_Tiempo" > "Silver"."Dim_Tiempo"."ID_Tiempo"
+Ref: "Silver"."Fact_Ciclo_Poda"."ID_Tiempo" > "Silver"."Dim_Tiempo"."ID_Tiempo"
+Ref: "Silver"."Fact_Tareo"."ID_Tiempo" > "Silver"."Dim_Tiempo"."ID_Tiempo"
+Ref: "Silver"."Fact_Fisiologia"."ID_Tiempo" > "Silver"."Dim_Tiempo"."ID_Tiempo"
+Ref: "Silver"."Fact_Peladas"."ID_Tiempo" > "Silver"."Dim_Tiempo"."ID_Tiempo"
+Ref: "Silver"."Fact_Cosecha_SAP"."ID_Condicion_Cultivo" > "Silver"."Dim_Condicion_Cultivo"."ID_Condicion"
+Ref: "Silver"."Fact_areas_plantas"."ID_Condicion" > "Silver"."Dim_Condicion_Cultivo"."ID_Condicion"
+Ref: "Silver"."Fact_Proyecciones"."ID_Estado_Workflow" > "Silver"."Dim_Estado_Workflow"."ID_Workflow"
+Ref: "Silver"."Fact_Maduracion"."ID_Cinta" > "Silver"."Dim_Cinta"."ID_Cinta"
+Ref: "Silver"."Fact_Maduracion"."ID_Estado_Fenologico" > "Silver"."Dim_Estado_Fenologico"."ID_Estado_Fenologico"
+Ref: "Silver"."Fact_Conteo_Fenologico"."ID_Estado_Fenologico" > "Silver"."Dim_Estado_Fenologico"."ID_Estado_Fenologico"
+Ref: "Silver"."Fact_Maduracion"."ID_Variedad" > "Silver"."Dim_Variedad"."ID_Variedad"
+Ref: "Silver"."Fact_Cosecha_SAP"."ID_Variedad" > "Silver"."Dim_Variedad"."ID_Variedad"
+Ref: "Silver"."Fact_Conteo_Fenologico"."ID_Variedad" > "Silver"."Dim_Variedad"."ID_Variedad"
+Ref: "Silver"."Fact_Induccion_Floral"."ID_Variedad" > "Silver"."Dim_Variedad"."ID_Variedad"
+Ref: "Silver"."Fact_Proyecciones"."ID_Variedad" > "Silver"."Dim_Variedad"."ID_Variedad"
+Ref: "Silver"."Fact_Tasa_Crecimiento_Brotes"."ID_Variedad" > "Silver"."Dim_Variedad"."ID_Variedad"
+Ref: "Silver"."Fact_Censo_Plantas"."ID_Variedad" > "Silver"."Dim_Variedad"."ID_Variedad"
+Ref: "Silver"."Fact_Evaluacion_Pesos"."ID_Variedad" > "Silver"."Dim_Variedad"."ID_Variedad"
+Ref: "Silver"."Fact_Ciclo_Poda"."ID_Variedad" > "Silver"."Dim_Variedad"."ID_Variedad"
+Ref: "Silver"."Fact_Fisiologia"."ID_Variedad" > "Silver"."Dim_Variedad"."ID_Variedad"
+Ref: "Silver"."Fact_Peladas"."ID_Variedad" > "Silver"."Dim_Variedad"."ID_Variedad"
+Ref: "Silver"."Fact_Tareo"."ID_Actividad_Operativa" > "Silver"."Dim_Actividad_Operativa"."ID_Actividad"
+Ref: "Silver"."Fact_Proyecciones"."ID_Escenario" > "Silver"."Dim_Escenario_Proyeccion"."ID_Escenario"
+Ref: "Silver"."Fact_Maduracion"."ID_Personal" > "Silver"."Dim_Personal"."ID_Personal"
+Ref: "Silver"."Fact_Conteo_Fenologico"."ID_Personal" > "Silver"."Dim_Personal"."ID_Personal"
+Ref: "Silver"."Fact_Induccion_Floral"."ID_Personal" > "Silver"."Dim_Personal"."ID_Personal"
+Ref: "Silver"."Fact_Tasa_Crecimiento_Brotes"."ID_Personal" > "Silver"."Dim_Personal"."ID_Personal"
+Ref: "Silver"."Fact_Evaluacion_Pesos"."ID_Personal" > "Silver"."Dim_Personal"."ID_Personal"
+Ref: "Silver"."Fact_Tareo"."ID_Personal" > "Silver"."Dim_Personal"."ID_Personal"
+Ref: "Silver"."Fact_Tareo"."ID_Personal_Supervisor" > "Silver"."Dim_Personal"."ID_Personal"
+Ref: "Silver"."Fact_Peladas"."ID_Personal" > "Silver"."Dim_Personal"."ID_Personal"
+Ref: "Silver"."Fact_areas_plantas"."ID_Campana" > "Silver"."Dim_Campana"."ID_Campana"
+Ref: "Silver"."Fact_Ciclo_Poda"."ID_Campana" > "Silver"."Dim_Campana"."ID_Campana"
+Ref: "Silver"."Fact_Conteo_Fenologico"."ID_Campana" > "Silver"."Dim_Campana"."ID_Campana"
+Ref: "Silver"."Fact_Cosecha_SAP"."ID_Campana" > "Silver"."Dim_Campana"."ID_Campana"
+Ref: "Silver"."Fact_Evaluacion_Pesos"."ID_Campana" > "Silver"."Dim_Campana"."ID_Campana"
+Ref: "Silver"."Fact_Floracion"."ID_Campana" > "Silver"."Dim_Campana"."ID_Campana"
+Ref: "Silver"."Fact_Evaluacion_Vegetativa"."ID_Campana" > "Silver"."Dim_Campana"."ID_Campana"
+Ref: "Silver"."Fact_Fisiologia"."ID_Campana" > "Silver"."Dim_Campana"."ID_Campana"
+Ref: "Silver"."Fact_Induccion_Floral"."ID_Campana" > "Silver"."Dim_Campana"."ID_Campana"
+Ref: "Silver"."Fact_Maduracion"."ID_Campana" > "Silver"."Dim_Campana"."ID_Campana"
+Ref: "Silver"."Fact_Peladas"."ID_Campana" > "Silver"."Dim_Campana"."ID_Campana"
+Ref: "Silver"."Fact_Proyecciones"."ID_Campana" > "Silver"."Dim_Campana"."ID_Campana"
+Ref: "Silver"."Fact_Censo_Plantas"."ID_Campana" > "Silver"."Dim_Campana"."ID_Campana"
+Ref: "Silver"."Fact_Tareo"."ID_Campana" > "Silver"."Dim_Campana"."ID_Campana"
+Ref: "Silver"."Fact_Tasa_Crecimiento_Brotes"."ID_Campana" > "Silver"."Dim_Campana"."ID_Campana"
+Ref: "Silver"."Fact_Telemetria_Clima"."ID_Campana" > "Silver"."Dim_Campana"."ID_Campana"
+Ref: "Silver"."Fact_Evaluacion_Pesos"."ID_Geografia" > "Silver"."Dim_Geografia"."ID_Geografia"
+Ref: "Silver"."Fact_Fisiologia"."ID_Geografia" > "Silver"."Dim_Geografia"."ID_Geografia"
+Ref: "Silver"."Fact_Induccion_Floral"."ID_Geografia" > "Silver"."Dim_Geografia"."ID_Geografia"
+Ref: "Silver"."Fact_Tasa_Crecimiento_Brotes"."ID_Geografia" > "Silver"."Dim_Geografia"."ID_Geografia"
+Ref: "Silver"."Fact_Tasa_Crecimiento_Brotes"."ID_Cama_Catalogo" > "Silver"."Dim_Cama_Catalogo"."ID_Cama_Catalogo"
+Ref: "Silver"."Fact_Tasa_Crecimiento_Brotes"."ID_Condicion" > "Silver"."Dim_Condicion_Cultivo"."ID_Condicion"
+Ref: "Silver"."Bridge_Modulo_Campana"."ID_Condicion" > "Silver"."Dim_Condicion_Cultivo"."ID_Condicion"
+Ref: "Silver"."Bridge_Geografia_Cama"."ID_Geografia" > "Silver"."Dim_Geografia"."ID_Geografia"
+Ref: "Silver"."Fact_Peladas"."ID_Geografia" > "Silver"."Dim_Geografia"."ID_Geografia"
+Ref: "Silver"."Fact_Conteo_Fenologico"."ID_Geografia" > "Silver"."Dim_Geografia"."ID_Geografia"
+Ref: "Silver"."Fact_Maduracion"."ID_Geografia" > "Silver"."Dim_Geografia"."ID_Geografia"
+Ref: "Silver"."Fact_Cosecha_SAP"."ID_Geografia" > "Silver"."Dim_Geografia"."ID_Geografia"
+Ref: "Silver"."Fact_Proyecciones"."ID_Geografia" > "Silver"."Dim_Geografia"."ID_Geografia"
+Ref: "Silver"."Fact_Censo_Plantas"."ID_Geografia" > "Silver"."Dim_Geografia"."ID_Geografia"
+Ref: "Silver"."Fact_Ciclo_Poda"."ID_Geografia" > "Silver"."Dim_Geografia"."ID_Geografia"
+Ref: "Silver"."Fact_Tareo"."ID_Geografia" > "Silver"."Dim_Geografia"."ID_Geografia"
+Ref: "Control"."Corrida_Evento"."ID_Corrida" > "Control"."Corrida"."ID_Corrida"
+Ref: "Control"."Corrida_Paso"."ID_Corrida" > "Control"."Corrida"."ID_Corrida"
+Ref: "Control"."Comando_Ejecucion"."ID_Corrida" > "Control"."Corrida"."ID_Corrida"
+Ref: "Silver"."Bridge_Geografia_Cama"."ID_Cama_Catalogo" > "Silver"."Dim_Cama_Catalogo"."ID_Cama_Catalogo"

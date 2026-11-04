@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "647b13b1-9659-4bc3-b04c-4619e6c8f04c",
+  "status": "current",
+  "command": "deliver",
+  "type": "tree",
+  "input": "D:\\DataWareHouse-main\\.archify\\architecture-acp-audit-20261103-204308\\refactor.candidate.json",
+  "output": "D:\\DataWareHouse-main\\.archify\\architecture-acp-audit-20261103-204308\\refactor-propuesto.html",
+  "specification": {
+    "sha256": "51e94901f5ca62116cb715f9287a5c703b4bd0abd525b96b81fb87962fadabfb",
+    "bytes": 3308
+  },
+  "artifact": {
+    "sha256": "85f61ab8c825ed29105c14e2547f3ae692598f5d912b500d79ef3bd8751fdd0e",
+    "bytes": 839557
+  }
+}

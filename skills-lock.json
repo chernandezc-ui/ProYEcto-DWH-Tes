@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "debugging-code": {
+      "source": "AlmogBaku/debug-skill",
+      "sourceType": "github",
+      "skillPath": "skills/debugging-code/SKILL.md",
+      "computedHash": "1010881ecf251f9e5519e689c96af2a0ae130bcc4aded2fd867693b207d29de7"
+    },
+    "impeccable": {
+      "source": "pbakaus/impeccable",
+      "sourceType": "github",
+      "skillPath": "skill/SKILL.md",
+      "computedHash": "343c75b0a7e65e97b3aba430ae9fcb387f91397b4852129e43a53d3ca45fb945"
+    }
+  }
+}

@@ -1,0 +1,502 @@
+================================================================================
+ETL ARCHITECTURE & DATA FLOWS - ACP DataWarehouse Proyecciones
+================================================================================
+
+MEDALLION ARCHITECTURE:
+Bronce (Raw) → Silver (Transformed) → Gold (Marts)
+
+================================================================================
+1. BRONCE INGESTION LAYER (Raw Excel + SAP)
+================================================================================
+
+CAMPO (Field)                        SAP
+  |                                  |
+  ├─ Conteo_Fruta                    ├─ Cosecha_SAP
+  ├─ Evaluacion_Vegetativa           ├─ Data_SAP
+  ├─ Evaluacion_Pesos                ├─ Consolidado_Tareos
+  ├─ Ciclos_Fenologicos
+  ├─ Maduracion                      LOGGER (24/7 Auto)
+  ├─ Peladas                         |
+  ├─ Floracion                       └─ Telemetria_Clima
+  ├─ Induccion_Floral
+  ├─ Fisiologia
+  ├─ Tasa_Crecimiento_Brotes
+  ├─ Evaluacion_Calidad_Poda
+  ├─ Censo_Plantas
+  ├─ Calibres
+  ├─ Reporte_Cosecha
+  ├─ Reporte_Clima
+  ├─ Cierre_Mapas_Cosecha
+  ├─ Seguimiento_Errores
+  ├─ Pintado_Flores
+  ├─ Proyeccion_Pesos
+  └─ Variables_Meteorologicas
+
+Cargador: /bronce/cargador.py
+  • Lee Excel desde /data/entrada/{carpeta}/
+  • Normaliza encabezados (quita tildes, espacios)
+  • Aplica alias de columnas estándares
+  • Valida layout crítico si es requerido
+  • Castea TODO a NVARCHAR (Bronce raw)
+  • Agrega Fecha_Sistema, Nombre_Archivo, Estado_Carga
+  • Inserta via fast_executemany
+  • Archiva Excel a /data/procesados/ o /data/rechazados/
+  • Registra en Auditoria.Carga_Archivos
+
+DETALLES CARGA:
+  ├─ Conteo_Fruta: auto-detecta header row (0 o 1), maneja hojas BD+Hoja1 o reporte
+  ├─ Evaluacion_Vegetativa: busca "Semanas_Poda_Raw" → lo agrega como "Floracion" si existe
+  ├─ Tasa_Crecimiento_Brotes: detecta hoja BD_General (histórico) vs reporte diario
+  ├─ Census_Plantas: pivota automático (estado_planta → filas) si está en formato ancho
+  ├─ Telemetria_Clima: extrae sector desde nombre archivo (ej: "A01_datos.xlsx" → sector="A01")
+  ├─ Data_SAP: trae datos post-cosecha (cliente, material, lote, almacén, pesos)
+  └─ Reporte_Clima: header en fila 3 (header=2) vs Reporte_Cosecha más simple
+
+================================================================================
+2. SILVER TRANSFORMATION LAYER (Normalized + MDM)
+================================================================================
+
+MDM HOMOLOGACION:
+  /config/homologacion_mdm.py + Portal MDM
+  ├─ Variedad_Raw → Variedad normalizada (Dim_Variedad)
+  ├─ Fundo_Raw → Fundo normalizado (Dim_Fundo_Catalogo)
+  ├─ Sector_Raw → Sector normalizado (Dim_Sector_Catalogo)
+  ├─ Modulo_Raw → Modulo normalizado (Dim_Modulo_Catalogo)
+  ├─ Turno_Raw → Turno normalizado (Dim_Turno_Catalogo)
+  ├─ Valvula_Raw → Valvula normalizada (Dim_Valvula_Catalogo)
+  ├─ Cama_Raw → Cama normalizada (Dim_Cama_Catalogo)
+  ├─ DNI → Dim_Personal (nombre, rol, sexo, planilla, asertivity %)
+  └─ Actividad+Labor → Dim_Actividad_Operativa
+
+DIMENSION BUILDING:
+
+  Dim_Tiempo (Calendario)
+    ├─ ID_Tiempo (YYYYMMDD)
+    ├─ Fecha (DATE)
+    ├─ Año, Mes, Semana_ISO, Semana_Cosecha
+    ├─ Día_Semana, Nombre_Mes, Es_Fin_Semana
+    └─ Precargado 2020-2035
+
+  Dim_Geografia (6-Level Composite)
+    ├─ ID_Fundo_Catalogo (from Dim_Fundo_Catalogo)
+    ├─ ID_Sector_Catalogo (from Dim_Sector_Catalogo)
+    ├─ ID_Modulo_Catalogo (from Dim_Modulo_Catalogo)
+    ├─ ID_Turno_Catalogo (from Dim_Turno_Catalogo)
+    ├─ ID_Valvula_Catalogo (from Dim_Valvula_Catalogo)
+    ├─ ID_Cama_Catalogo (from Dim_Cama_Catalogo)
+    ├─ Es_Test_Block (flag para experimentos)
+    ├─ Codigo_SAP_Campo (mapping a SAP si existe)
+    ├─ Nivel_Granularidad (enum: modulo/turno/valvula/cama)
+    └─ Vigencia (Fecha_Inicio/Fin_Vigencia, Es_Vigente)
+
+FACT TRANSFORMATIONS:
+
+  FENOLOGÍA (Fruit Stage Progression)
+  ┌─────────────────────────────────────────────────────────────┐
+  │ Bronce.Conteo_Fruta (raw 20+ cols)                          │
+  │   ├─ Fecha_Raw, Modulo_Raw, Turno_Raw, Valvula_Raw        │
+  │   ├─ Punto_Raw, Variedad_Raw                               │
+  │   └─ BotonesFlorales_Raw, Flores_Raw, BayasPequenas_Raw... │
+  │       (parse cada columna de frutas por etapa)              │
+  │                                                              │
+  │ Transformación:                                             │
+  │   └─ Parse estado_fenologico de cada columna               │
+  │      Aggregate: Flores = Flores_Raw,                       │
+  │                 Bayas_Pequenas = BayasPequenas_Raw,        │
+  │                 ... para CADA estado_fenologico             │
+  │      Join: Geografia + Tiempo + Variedad + Personal        │
+  │      Result: Fact_Conteo_Fenologico                        │
+  └─────────────────────────────────────────────────────────────┘
+      ↓ (insumo core)
+      Fact_Conteo_Fenologico
+      ├─ ID_Geografia, ID_Tiempo, ID_Variedad
+      ├─ ID_Estado_Fenologico, Cantidad_Organos (SUM)
+      ├─ ID_Personal (evaluador), Punto
+      ├─ Fecha_Evento, Fecha_Sistema, Estado_DQ
+      └─ ID_Campana
+
+  PESOS Y CALIBRES (Berry Weight Curves)
+  ┌─────────────────────────────────────────────────────────────┐
+  │ Bronce.Evaluacion_Pesos (weight samples by stage)           │
+  │ Transformación:                                             │
+  │   ├─ Clean weights (convert g/baya to float)               │
+  │   ├─ Parse tipo_evaluacion (if exists)                    │
+  │   ├─ Join Dim_Personal (from DNI_Raw)                      │
+  │   ├─ Join Dim_Geografia (from modulo+turno+valvula+cama)   │
+  │   └─ Result: Fact_Evaluacion_Pesos                         │
+  │              (fecha, geografia, variedad, personal,         │
+  │               peso_promedio_g, muestra_count)              │
+  └─────────────────────────────────────────────────────────────┘
+      ↓ (insumo yield modeling)
+      Fact_Evaluacion_Pesos
+      ├─ Peso_Promedio_Baya_g (calculated)
+      ├─ Cantidad_Bayas_Muestra (sample size)
+      ├─ Peso_Proyectado_Baya_g (from model)
+      └─ (curves fitted by data scientists → model inputs)
+
+  COSECHA REAL (Harvest Truth-Set)
+  ┌─────────────────────────────────────────────────────────────┐
+  │ Bronce.Cosecha_SAP (SAP harvest records)                    │
+  │ Transformación:                                             │
+  │   ├─ Parse Kg_Total_Raw → Kg_Neto_MP (numeric)            │
+  │   ├─ Join Dim_Condicion_Cultivo (FROM CONFIG)              │
+  │   ├─ Join Dim_Geografia (from modulo+turno+valvula+var)    │
+  │   ├─ Estado_DQ: 'Aprobado' by default                      │
+  │   └─ Result: Fact_Cosecha_SAP                              │
+  │              (fecha, geografia, variedad,                  │
+  │               condicion_cultivo, kg_neto_mp)               │
+  └─────────────────────────────────────────────────────────────┘
+      ↓ (actuals para validar forecast)
+      Fact_Cosecha_SAP
+      ├─ **Source of truth** para Mart_Cosecha
+      └─ Join con Fact_Proyecciones (ID_Tiempo + Geografia + Variedad)
+         → MAPE = |Proyectado - Real| / Real
+
+  ESTRUCTURA VEGETAL (Plant Architecture)
+  ┌─────────────────────────────────────────────────────────────┐
+  │ Bronce.Evaluacion_Vegetativa (pisos 1-5)                    │
+  │ Transformación:                                             │
+  │   ├─ Parse cada piso (Piso1_Brotes_Raw...Piso5_Diametro)  │
+  │   ├─ Unpivot: (piso, brotes, productivos, diametro)       │
+  │   ├─ Clean numerics                                        │
+  │   ├─ Calc: Ratio_Productivo = Productivos/Brotes_Total    │
+  │   └─ Result: Fact_Evaluacion_Vegetativa                    │
+  │              (fecha, geografia, variedad, piso,             │
+  │               altura, tallos_basales, brotes, diametro)    │
+  └─────────────────────────────────────────────────────────────┘
+      ↓ (crop health prediction)
+      Fact_Evaluacion_Vegetativa
+      └─ Inputs to agronomist DSS: disease risk, pollination viability
+
+  LABOR & TAREOS (Timesheets)
+  ┌─────────────────────────────────────────────────────────────┐
+  │ Bronce.Consolidado_Tareos (SAP labor)                       │
+  │ Transformación:                                             │
+  │   ├─ Parse DNIResponsable → JOIN Dim_Personal              │
+  │   ├─ Parse Actividad+Labor → JOIN Dim_Actividad_Operativa │
+  │   ├─ Parse Modulo+Turno+Valvula → JOIN Dim_Geografia       │
+  │   ├─ Convert HorasTrabajadas to DECIMAL(6,2)              │
+  │   └─ Result: Fact_Tareo                                    │
+  │              (fecha, personal, actividad, geografia,        │
+  │               horas_trabajadas)                            │
+  └─────────────────────────────────────────────────────────────┘
+      ↓ (labor costing)
+      Fact_Tareo
+      └─ Aggregated to Mart_Administrativo (by semana_iso + rol)
+
+  CLIMATE CONTINUOUS (24/7 Telemetry)
+  ┌─────────────────────────────────────────────────────────────┐
+  │ Bronce.Telemetria_Clima (hourly logger data)                │
+  │ Transformación:                                             │
+  │   ├─ Parse FechaHora → extract fecha + hora                │
+  │   ├─ Join Dim_Tiempo (by fecha)                            │
+  │   ├─ Convert T/humedad/lluvia to DECIMAL                   │
+  │   ├─ Calc: VPD_Horario = 0.6108 * EXP(17.27*T/(T+237.3))  │
+  │   │           * (1 - RH/100)  [Tetens formula]             │
+  │   ├─ Calc: GDD_Intervalo = (T-10) * dt_dias                │
+  │   └─ Result: Fact_Telemetria_Clima                         │
+  │              (fecha_hora, sector, id_tiempo,                │
+  │               temp, humedad, lluvia, vpd, radiacion)       │
+  └─────────────────────────────────────────────────────────────┘
+      ↓ (crop physiology modeling)
+      Fact_Telemetria_Clima
+      ├─ Aggregated to Mart_Clima (daily by sector)
+      └─ Inputs: disease risk DSS, irrigation scheduling, GDD accumulation
+
+PUENTES MANY-TO-MANY:
+
+  Bridge_Geografia_Cama
+    (una geografía puede estar en múltiples camas, viceversa)
+    ├─ ID_Geografia → Dim_Geografia
+    ├─ ID_Cama_Catalogo → Dim_Cama_Catalogo
+    ├─ Fecha_Inicio_Vigencia, Fecha_Fin_Vigencia
+    └─ Es_Vigente (flag activo)
+
+  Bridge_Geografia_Campana_Condicion
+    (qué geografía+condición es activa en qué campaña)
+    ├─ ID_Geografia → Dim_Geografia
+    ├─ ID_Campana → Dim_Campana
+    ├─ ID_Condicion → Dim_Condicion_Cultivo
+    ├─ Vigencia_Inicio, Vigencia_Fin
+    └─ Hash_Llave (dedup)
+
+  Bridge_Modulo_Campana
+    (módulo qué variedad en qué campaña)
+    ├─ ID_Modulo_Catalogo → Dim_Modulo_Catalogo
+    ├─ ID_Variedad → Dim_Variedad
+    ├─ ID_Campana → Dim_Campana
+    ├─ Tipo_Campana (enum)
+    └─ Fecha_Inicio, Fecha_Fin
+
+================================================================================
+3. GOLD AGGREGATION LAYER (Power BI Marts)
+================================================================================
+
+WEEKLY AGGREGATES (Semana_ISO grain):
+
+  Mart_Fenologia
+    ├─ FROM Fact_Conteo_Fenologico + Fact_Fisiologia + Fact_Ciclos_Fenologicos
+    ├─ GROUP BY semana_iso, modulo, variedad, estado_fenologico
+    ├─ Columns: Cantidad_Bayas, Brotes_Productivos, Color_Cinta, Pct_Cosechable
+    └─ Purpose: "¿En qué etapa están las frutas?" → harvest timing DSS
+
+  Mart_Cosecha
+    ├─ FROM Fact_Cosecha_SAP + Fact_Proyecciones
+    ├─ JOIN Fact_Cosecha LEFT JOIN Proyecciones (on ID_Tiempo, ID_Geo, ID_Var)
+    ├─ Columns: Kg_Neto_Real, Kg_Proyectados, Pct_Cumplimiento, Jabas
+    └─ Purpose: "¿Cuánto cosechamos vs forecast?" → supply/sales dashboard
+
+  Mart_Proyecciones
+    ├─ FROM Fact_Proyecciones (filtered ID_Escenario = ESCENARIO_OFICIAL from Config)
+    ├─ LEFT JOIN Fact_Cosecha_SAP (on ID_Tiempo, ID_Geo, ID_Var) para Kg_Real
+    ├─ Columns: Kg_Proyectados, MAPE (error%), Flag_Override, Version_Modelo, Estado_Workflow
+    ├─ Purpose: "¿Cuánto esperar próximas 6 semanas?" + accuracy audit
+    └─ Power BI connect ONLY to this mart for forecasts
+
+  Mart_Clima
+    ├─ FROM Fact_Telemetria_Clima (aggregated daily)
+    ├─ Daily grain per sector (before weekly grain in Power BI)
+    ├─ Calc: T_Avg = AVG(T_Exterior), VPD_Avg = AVG(VPD_Horario), GDD = SUM(GDD_Intervalo)
+    ├─ Columns: Temp_Max/Min, VPD_Promedio, Humedad, Precipitacion_Total, Indice_UV
+    └─ Purpose: Climate-crop physiology DSS (disease risk models, irrigation)
+
+  Mart_Evaluacion_Vegetativa
+    ├─ FROM Fact_Evaluacion_Vegetativa
+    ├─ GROUP BY semana_iso, piso, geografia, variedad
+    ├─ Columns: Altura_Promedio, Tallos_Basales_Promedio, Brotes_Generales_Promedio,
+    │           Brotes_Productivos_Promedio, Diametro_Promedio, Ratio_Productivo
+    └─ Purpose: Plant vigor dashboard + disease risk prediction
+
+  Mart_Administrativo
+    ├─ FROM Fact_Tareo + Dim_Personal + Dim_Actividad_Operativa
+    ├─ GROUP BY semana_iso, dni_personal, id_actividad
+    ├─ Columns: Horas_Trabajadas, Dias_Trabajados, Pct_Asertividad,
+    │           Registros_Observados_SAP, Supervisor
+    └─ Purpose: Weekly labor KPI dashboard (HR reporting)
+
+  Mart_Ciclo_Poda
+    ├─ FROM Fact_Ciclo_Poda
+    ├─ GROUP BY semana_iso, geografia, variedad
+    ├─ Columns: Tallos_Planta_Total, Longitud_Tallo_Total, Diametro_Tallo_Total,
+    │           Ramilla_Planta_Total, Tocones_Planta_Total, Defectos_Total
+    └─ Purpose: Pruning quality QA dashboard (field supervisors)
+
+  Mart_Pesos_Calibres
+    ├─ FROM Fact_Evaluacion_Pesos + Bronce.Calibres
+    ├─ GROUP BY semana_iso, geografia, variedad
+    ├─ Columns: Peso_Promedio_Baya_g, Calibre_Pequeno_Pct, Calibre_Mediano_Pct,
+    │           Calibre_Grande_Pct
+    └─ Purpose: Harvest quality dashboard (weight trajectory + caliber distribution)
+
+  Mart_Tasa_Crecimiento
+    ├─ FROM Fact_Tasa_Crecimiento_Brotes
+    ├─ GROUP BY semana_iso, condicion (experiment/control), geografia, variedad
+    ├─ Columns: Growth_Rate_Cm_Dia, Dias_Desde_Poda
+    └─ Purpose: Pruning timing DSS (when to prune based on growth rate)
+
+  Mart_Induccion_Floral
+    ├─ FROM Fact_Induccion_Floral
+    ├─ Columns: Pct_Plantas_Con_Induccion, Pct_Brotes_Con_Flor
+    └─ Purpose: Off-season flowering control tracking (counter-seasonal crops)
+
+================================================================================
+4. ETL ORCHESTRATION & CONTROL FLOW
+================================================================================
+
+PIPELINE.PY (Main Orchestrator)
+  │
+  ├─ 1. BRONCE LOADING
+  │  └─ cargador.ejecutar_carga_bronce()
+  │     ├─ Find all files in /data/entrada/
+  │     ├─ For each file: cargar_archivo(nombre_carpeta, ruta, tabla_destino)
+  │     │  ├─ Detects sheet + header via _detectar_hoja_y_header()
+  │     │  ├─ Special projectors for: Conteo, Peladas, Induccion, Tasa_Crec, Censo, Telemetria, Clima
+  │     │  ├─ Validates layout (critical checks for Floracion, Fisiologia)
+  │     │  ├─ Aligns columns to table (alinear_dataframe_a_tabla)
+  │     │  ├─ Inserts via fast_executemany()
+  │     │  └─ Archives file to /data/procesados/ or /data/rechazados/
+  │     └─ registrar_fin() in Auditoria.Carga_Archivos
+  │
+  ├─ 2. SILVER TRANSFORMATION
+  │  ├─ Load MDM rules from Config.Homologacion_MDM
+  │  ├─ Refresh Dim_* (Variedad, Fundo, Sector, Modulo, Turno, Valvula, Cama)
+  │  ├─ Build Dim_Geografia (JOIN 6 catalogs)
+  │  ├─ Transform Bronce → Silver Facts (14 fact transformers):
+  │  │  ├─ fact_conteo_fenologico.py
+  │  │  ├─ fact_cosecha_sap.py
+  │  │  ├─ fact_evaluacion_pesos.py
+  │  │  ├─ fact_evaluacion_vegetativa.py
+  │  │  ├─ fact_fisiologia.py
+  │  │  ├─ fact_floracion.py
+  │  │  ├─ fact_induccion_floral.py
+  │  │  ├─ fact_ciclo_poda.py
+  │  │  ├─ fact_tasa_crecimiento_brotes.py
+  │  │  ├─ fact_telemetria_clima.py
+  │  │  ├─ fact_tareo.py
+  │  │  ├─ fact_censo_plantas.py
+  │  │  ├─ fact_ciclos_fenologicos.py
+  │  │  └─ fact_areas_plantas.py
+  │  └─ Each fact: TRUNCATE + INSERT (idempotent re-runs)
+  │
+  ├─ 3. PROJECTION MODEL (External)
+  │  ├─ Input: Fact_Conteo_Fenologico + Fact_Evaluacion_Pesos + Fact_Telemetria_Clima
+  │  ├─ Model: 6-week rolling forecast per (geografia, variedad, escenario)
+  │  ├─ Output: Fact_Proyecciones
+  │  │  ├─ Kg_Proyectados (3 escenarios: Conservative/Base/Optimistic)
+  │  │  ├─ Version_Modelo (git hash or version number)
+  │  │  ├─ MAPE (model accuracy metric)
+  │  │  ├─ Flag_Override + Motivo_Override (manual corrections)
+  │  │  └─ Estado_Workflow (draft → validated → published)
+  │  └─ Stored as Fact_Proyecciones with full audit trail
+  │
+  ├─ 4. GOLD REFRESH (Conditional)
+  │  ├─ Check: ALL facts_bloqueantes completed without ERROR
+  │  │  └─ Default blockers:
+  │  │     [Cosecha_SAP, Conteo_Fenologico, Evaluacion_Pesos,
+  │  │      Telemetria_Clima, Fisiologia, Peladas, Induccion_Floral,
+  │  │      Tasa_Crecimiento_Brotes, Ciclo_Poda]
+  │  ├─ IF all OK:
+  │  │  └─ For each Mart in MARTS list:
+  │  │     ├─ TRUNCATE Gold.Mart_*
+  │  │     ├─ Refresh stored proc refrescar_mart_*()
+  │  │     └─ Log row count
+  │  └─ ELSE:
+  │     ├─ Skip Gold refresh
+  │     ├─ Emit alert: "Forecast blocked due to [{failing facts}]"
+  │     └─ Power BI connects to stale data (previous run)
+  │
+  └─ 5. LOGGING & ALERTS
+     ├─ Auditoria.Carga_Archivos (complete lineage)
+     ├─ Email alerts if:
+     │  ├─ Any file rejected (LAYOUT_INCOMPATIBLE, RUTA_CONTENIDO_INCOMPATIBLE)
+     │  ├─ Any fact fails (ERROR state)
+     │  └─ Gold refresh skipped
+     └─ Log all success counts (filas insertadas por tabla)
+
+FACTS_BLOQUEANTES (From Control.Parametros_Pipeline):
+  └─ If ANY blocker fails, Gold Marts are NOT refreshed
+     ├─ This prevents stale forecasts from being published
+     ├─ Power BI still shows previous week's data
+     └─ Ensures data integrity over timeliness
+
+================================================================================
+5. POWER BI CONNECTION
+================================================================================
+
+Power BI ONLY connects to Gold schema (12 Marts):
+  ├─ Mart_Cosecha (weekly actual vs forecast)
+  ├─ Mart_Proyecciones (executive forecast dashboard)
+  ├─ Mart_Fenologia (fruit stage progression)
+  ├─ Mart_Clima (climate analytics)
+  ├─ Mart_Evaluacion_Vegetativa (plant vigor)
+  ├─ Mart_Ciclo_Poda (pruning QA)
+  ├─ Mart_Pesos_Calibres (harvest quality)
+  ├─ Mart_Administrativo (labor KPIs)
+  ├─ Mart_Tasa_Crecimiento (growth rates)
+  ├─ Mart_Induccion_Floral (off-season success)
+  ├─ Mart_Censo_Plantas (field health)
+  └─ (+ any other Gold marts added)
+
+Direct reporting from Silver/Bronce: FORBIDDEN
+  ├─ Ensures data consistency
+  ├─ Allows ETL to iterate on Bronce/Silver without breaking dashboards
+  └─ Simplifies Power BI model
+
+================================================================================
+6. DATA QUALITY GATES
+================================================================================
+
+Bronce Level:
+  ├─ Layout validation: mandatory columns for critical facts
+  │  └─ Floracion: requires {Fecha, DNI, Modulo, Turno, Valvula, Cama, N_Plantas_Evaluadas, N_Plantas_en_Floracion}
+  │  └─ Fisiologia: requires {Fecha, Modulo, Variedad, Tercio, Hinchadas, Productivas, Total_Org}
+  ├─ Route validation: if file content matches different route with >80% confidence → RECHAZADO
+  │  └─ Example: "evaluacion_vegetativa" file with Tasa_Crecimiento columns → suggest tasa_crecimiento_brotes route
+  ├─ Column alignment: unmatched columns stored in Valores_Raw (JSON-ish: "col=val | col2=val2")
+  └─ File archival: successful files → /data/procesados/, failures → /data/rechazados/
+
+Silver Level:
+  ├─ Estado_DQ = 'Aprobado' (default) or 'Error' (if validation fails)
+  ├─ Dates parse-checked (DATETIME2 format)
+  ├─ Numerics validated (DECIMAL precision)
+  ├─ Foreign keys: ID_Geografia, ID_Personal, ID_Variedad MUST exist
+  ├─ Circuit breaker: If >5% rows rejected → entire fact load ABORTED
+  └─ Null allowance: Strategic NULLs OK (e.g., ID_Personal NULL for auto-sensors)
+
+Gold Level:
+  ├─ No nulls in key dimensions (Semana_ISO, Modulo, Variedad, etc.)
+  ├─ Aggregates >= 1 row per group (no empty marts)
+  └─ Only refreshed if all blockers pass
+
+================================================================================
+7. MDM & CONFIGURATION MANAGEMENT
+================================================================================
+
+Config.Homologacion_MDM (Master Data Rules):
+  ├─ Stored: (tabla_destino, valor_raw, valor_normalizado, activo, fecha_vigencia_ini, fecha_vigencia_fin)
+  ├─ Example:
+  │  └─ (Variedad, "DUKE", "Duke", 1, 2024-01-01, NULL) ← Duke is active
+  │  └─ (Variedad, "BILOXI", "Biloxi", 1, 2024-01-01, NULL)
+  │  └─ (Modulo, "M1", "1", 1, ...)
+  │  └─ (Turno, "T", "1", 1, ...)
+  └─ Loaded into memory at pipeline start → all transformations apply rules
+
+Control.Parametros_Pipeline (Feature Flags & Config):
+  ├─ FACTS_BLOQUEANTES = frozenset([...]) ← which facts must succeed for Gold refresh
+  ├─ ESCENARIO_PROYECCION_OFICIAL = 4 ← which scenario ID is "the forecast" for Power BI
+  ├─ HORIZONTE_PROYECCIONES_SEMANAS = 6 ← forecast horizon (weeks)
+  ├─ UMBRAL_RECHAZO_BRONCE_PCT = 5 ← circuit breaker for fact rejection
+  └─ Loaded from database: Config.Parametros_Pipeline or fallback to hardcoded in pipeline.py
+
+Portal MDM (Web Interface):
+  ├─ Edit Homologacion_MDM rules (new variants + mapping)
+  ├─ Audit trail of who changed what when
+  ├─ No code deployment needed for data mapping changes
+  └─ Next ETL run applies new rules
+
+================================================================================
+8. LINEAGE & AUDITORIA
+================================================================================
+
+Auditoria.Carga_Archivos (Log every file load):
+  ├─ ID_Log (bigint PK)
+  ├─ Tabla_Destino (e.g., "Bronce.Conteo_Fruta")
+  ├─ Nombre_Archivo (e.g., "Conteo_20260603.xlsx")
+  ├─ Fecha_Inicio_Carga
+  ├─ Fecha_Fin_Carga
+  ├─ Estado ('OK' | 'ERROR' | 'VACIO' | 'RECHAZADO')
+  ├─ Filas_Insertadas
+  ├─ Filas_Rechazadas
+  ├─ Motivo_Rechazo (if applicable)
+  ├─ Columnas_Extra (if detected)
+  └─ Ruta_Archivo_Archivado
+
+Data Lineage (Implícito):
+  ├─ Bronce.Conteo_Fruta
+  │  └─ ID_Origen_Bronce (FK to Bronce row)
+  │     → Silver.Fact_Conteo_Fenologico
+  │        → Gold.Mart_Fenologia
+  │           → Power BI Fenologia Dashboard
+  └─ Ejemplo: "Este dato en Power BI vino de ESTE Excel archivado en FECHA con ESTADO"
+
+================================================================================
+9. DEPLOYMENT & RE-RUN SAFETY
+================================================================================
+
+Idempotency:
+  ├─ Bronce: Uses "file marker" (*.xlsx.procesado.json) to skip already-loaded files
+  │  ├─ Marker includes: filename, file size, mtime_ns, estado, destino
+  │  ├─ If file untouched → skip load (even if file still in /entrada/)
+  │  └─ If file CHANGED → reload (and move old file to archive)
+  ├─ Silver: TRUNCATE + INSERT (safe to re-run, idempotent by design)
+  └─ Gold: TRUNCATE + INSERT via stored procedures (idempotent)
+
+Re-run scenarios:
+  ├─ "I want to re-process yesterday's data" → Delete markers for those files → ETL re-loads
+  ├─ "Gold has stale data" → Clear markers + re-run ETL
+  ├─ "Model parameters changed" → Reprocess Silver with new Homologacion_MDM rules
+  └─ All safe because TRUNCATE + INSERT means no duplicates accumulate
+
+================================================================================
+END OF ARCHITECTURE DOCUMENT
+================================================================================

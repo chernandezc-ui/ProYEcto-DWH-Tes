@@ -1,0 +1,59 @@
+schema,table,error_tipo,detalle
+Bronce,Data_SAP,Clave Nula,La columna clave [Consumidor_PEP_Raw] tiene 157921 registros nulos.
+Bronce,Data_SAP,Clave Nula,La columna clave [Des_Consumidor_PEP_Raw] tiene 157921 registros nulos.
+Bronce,Data_SAP,Clave Nula,La columna clave [Cantidad_Jabas_Raw] tiene 157921 registros nulos.
+Bronce,Data_SAP,Clave Nula,La columna clave [FechaSubida_Raw] tiene 157921 registros nulos.
+Silver,Fact_Ciclos_Fenologicos,Clave Nula,La columna clave [id_origen_rastreo] tiene 14221 registros nulos.
+Silver,Fact_Ciclos_Fenologicos,Clave Nula,La columna clave [ID_Cinta] tiene 12009 registros nulos.
+Bronce,Proyeccion_Pesos,Tabla Vacia,La tabla tiene 0 registros.
+Silver,Dim_Actividad_Operativa,Clave Nula,La columna clave [ID_SAP] tiene 12 registros nulos.
+Silver,Dim_Actividad_Operativa,Clave Nula,La columna clave [ID_Labor] tiene 12 registros nulos.
+Silver,Dim_Personal,Clave Nula,La columna clave [ID_Planilla] tiene 231 registros nulos.
+Silver,Dim_Personal,Clave Nula,La columna clave [Pct_Asertividad] tiene 231 registros nulos.
+Silver,Fact_areas_plantas,Clave Nula,La columna clave [ID_Condicion] tiene 3865 registros nulos.
+Bronce,Evaluacion_Vegetativa,Clave Nula,La columna clave [Fecha_Subida_Raw] tiene 101505 registros nulos.
+MDM,Catalogo_Personal,Tabla Vacia,La tabla tiene 0 registros.
+MDM,Alertas,Tabla Vacia,La tabla tiene 0 registros.
+MDM,Cuarentena,Clave Nula,La columna clave [Valor_Corregido] tiene 15763 registros nulos.
+Auditoria,Cambios_Portal,Tabla Vacia,La tabla tiene 0 registros.
+Bronce,Censo_Plantas,Clave Nula,La columna clave [Fecha_Subida_Raw] tiene 17585 registros nulos.
+Bronce,Cosecha_SAP,Tabla Vacia,La tabla tiene 0 registros.
+Silver,Fact_Proyecciones,Clave Nula,La columna clave [ID_Version_Datos] tiene 5360 registros nulos.
+Silver,Fact_Proyecciones,Clave Nula,La columna clave [Motivo_Override] tiene 5360 registros nulos.
+Silver,Fact_Proyecciones,Clave Nula,La columna clave [ID_Campana] tiene 5360 registros nulos.
+Silver,Fact_Tasa_Crecimiento_Brotes,Clave Nula,La columna clave [ID_Condicion] tiene 215326 registros nulos.
+Config,Analogos_Variedades,Tabla Vacia,La tabla tiene 0 registros.
+Config,Calendario_Entregables,Tabla Vacia,La tabla tiene 0 registros.
+Silver,Bridge_Modulo_Campana,Clave Nula,La columna clave [ID_Condicion] tiene 16 registros nulos.
+Auditoria,Log_Decisiones_MDM,Tabla Vacia,La tabla tiene 0 registros.
+Auditoria,Log_Versiones_Modelo,Tabla Vacia,La tabla tiene 0 registros.
+Bronce,Fenologia,Tabla Vacia,La tabla tiene 0 registros.
+MDM,Alerta_Ack,Tabla Vacia,La tabla tiene 0 registros.
+Bronce,Dashboard,Tabla Vacia,La tabla tiene 0 registros.
+Silver,Fact_Conteo_Frutas,Tabla Vacia,La tabla tiene 0 registros.
+Bronce,Conteo_Fruta,Clave Nula,La columna clave [Fecha_Subida_Raw] tiene 474241 registros nulos.
+Bronce,Induccion_Floral,Clave Nula,La columna clave [Fecha_Subida_Raw] tiene 48860 registros nulos.
+Bronce,Floracion,Clave Nula,La columna clave [Fecha_Subida_Raw] tiene 25343 registros nulos.
+Bronce,Ciclos_Fenologicos,Clave Nula,La columna clave [FechaSubida_Raw] tiene 21284 registros nulos.
+Bronce,Ciclos_Fenologicos,Clave Nula,La columna clave [ID_Estado_Ciclo_Raw] tiene 18912 registros nulos.
+Control,Corrida,Clave Nula,La columna clave [PID_Runner] tiene 47 registros nulos.
+Control,Corrida,Clave Nula,La columna clave [ID_Log_Auditoria] tiene 1 registros nulos.
+Bronce,Pintado_Flores,Tabla Vacia,La tabla tiene 0 registros.
+Silver,Fact_Tareo,Tabla Vacia,La tabla tiene 0 registros.
+Bronce,Tasa_Crecimiento_Brotes,Clave Nula,La columna clave [Fecha_Subida_Raw] tiene 216352 registros nulos.
+Bronce,Fisiologia,Clave Nula,La columna clave [Fecha_Subida_Raw] tiene 44415 registros nulos.
+Bronce,Calibres,Tabla Vacia,La tabla tiene 0 registros.
+Control,Bloqueo_Ejecucion,Clave Nula,La columna clave [ID_Corrida_Activa] tiene 1 registros nulos.
+Control,Bloqueo_Ejecucion,Clave Nula,La columna clave [Adquirido_Por] tiene 1 registros nulos.
+Silver,Fact_Peladas_Old,Tabla Vacia,La tabla tiene 0 registros.
+Bronce,Consolidado_Tareos,Tabla Vacia,La tabla tiene 0 registros.
+Bronce,Seguimiento_Errores,Tabla Vacia,La tabla tiene 0 registros.
+Bronce,Telemetria_Clima,Clave Nula,La columna clave [Velocidad_Max_KmH_Raw] tiene 68675 registros nulos.
+Bronce,Telemetria_Clima,Clave Nula,La columna clave [Velocidad_Max_Ms_Raw] tiene 68675 registros nulos.
+Bronce,Telemetria_Clima,Clave Nula,La columna clave [Intensidad_Lluvia_Raw] tiene 81402 registros nulos.
+Bronce,Evaluacion_Pesos,Clave Nula,La columna clave [Fecha_Subida_Raw] tiene 5963 registros nulos.
+Bronce,Reporte_Cosecha,Tabla Vacia,La tabla tiene 0 registros.
+Bronce,Cierre_Mapas_Cosecha,Tabla Vacia,La tabla tiene 0 registros.
+Silver,Fact_Telemetria_Clima,Clave Nula,La columna clave [Velocidad_Max_KmH] tiene 68564 registros nulos.
+Silver,Fact_Telemetria_Clima,Clave Nula,La columna clave [Velocidad_Max_Ms] tiene 68564 registros nulos.
+Silver,Fact_Telemetria_Clima,Clave Nula,La columna clave [Intensidad_Lluvia_mm_hr] tiene 81267 registros nulos.
