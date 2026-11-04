@@ -7,14 +7,12 @@ Reemplaza dos implementaciones divergentes que existian:
 - ETL/config/conexion.py (singleton manual + os.getenv + pool tuned)
 - backend/nucleo/conexion.py (lru_cache + settings)
 
-Estrategia: leer env vars con dotenv si esta disponible; permitir override por
-parametros (necesario para tests). Pool configurado para corridas ETL largas;
-backend tambien reusa el mismo pool (pool_size=5 + overflow=2 cubre ambos).
+Configuración canónica en comun/configuracion.py; un .env en la raíz y
+overrides explícitos para tests. Cada proceso conserva su propio pool.
 """
 
 from __future__ import annotations
 
-import os
 import threading
 import urllib
 import warnings
@@ -24,11 +22,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SAWarning
 
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
+from comun import configuracion
 
 warnings.filterwarnings(
     "ignore",
@@ -48,11 +42,16 @@ def _construir_cadena_pyodbc(
     clave: str | None = None,
     driver: str | None = None,
 ) -> str:
-    servidor = servidor or os.getenv("DB_SERVIDOR", "LCP-PAG-PRACTIC")
-    base = base or os.getenv("DB_NOMBRE", "ACP_DataWarehose_Proyecciones")
-    usuario = usuario or os.getenv("DB_USUARIO")
-    clave = clave or os.getenv("DB_CLAVE")
-    driver = driver or os.getenv("DB_DRIVER", "ODBC Driver 17 for SQL Server")
+    overrides = {key: value for key, value in {
+        'DB_SERVIDOR': servidor, 'DB_NOMBRE': base, 'DB_USUARIO': usuario,
+        'DB_CLAVE': clave, 'DB_DRIVER': driver,
+    }.items() if value is not None}
+    config = (
+        configuracion.ConfiguracionBD(_env_file=configuracion.ENV_GLOBAL, **overrides)
+        if overrides else configuracion.obtener_configuracion_bd()
+    )
+    servidor, base = config.db_servidor, config.db_nombre
+    usuario, clave, driver = config.db_usuario, config.db_clave, config.db_driver
 
     # El driver legacy "SQL Server" (el que viene preinstalado en Windows)
     # NO soporta `TrustServerCertificate`. Si alguien lo configura, pyodbc
@@ -122,6 +121,7 @@ def resetear_engine() -> None:
         if _engine is not None:
             _engine.dispose()
             _engine = None
+        configuracion.obtener_configuracion_bd.cache_clear()
 
 
 def verificar_conexion() -> dict:

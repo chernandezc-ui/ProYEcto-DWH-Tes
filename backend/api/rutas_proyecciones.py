@@ -1,5 +1,6 @@
 from typing import Dict, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
+from dominio.proyecciones import ErrorValidacionProyeccion
 from nucleo.auth import require_rol
 from schemas.proyecciones.peticion import PeticionEjecutarProyeccion
 from schemas.proyecciones.respuesta import RespuestaProyeccion
@@ -28,19 +29,14 @@ async def integridad_datos(id_tiempo: int, modulo: Optional[int] = None, varieda
 
 @enrutador_proyecciones.get("/matriz", dependencies=[Depends(require_rol("viewer"))])
 async def cargar_matriz():
-    import asyncio
-    import repositorios.repo_proyecciones as repo
-    data = await asyncio.to_thread(repo.leer_param_json, "PROY_SIXWEEK_MATRIZ_INPUTS")
-    if not data:
-        return {}
-    return data
+    return await servicio.obtener_matriz_proyeccion()
 
 @enrutador_proyecciones.post("/matriz", dependencies=[Depends(require_rol("analista_mdm"))])
 async def guardar_matriz(matriz: Dict[str, Dict[str, Any]]):
-    import asyncio
-    import repositorios.repo_proyecciones as repo
-    ok = await asyncio.to_thread(repo.guardar_param_json, "PROY_SIXWEEK_MATRIZ_INPUTS", matriz, "Matriz de inputs % maduración Six-Week")
-    return {"ok": ok}
+    try:
+        return await servicio.guardar_matriz_proyeccion(matriz)
+    except ErrorValidacionProyeccion as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 @enrutador_proyecciones.post("/ejecutar", response_model=RespuestaProyeccion, dependencies=[Depends(require_rol("analista_mdm"))])
 async def ejecutar(peticion: PeticionEjecutarProyeccion):
@@ -79,5 +75,5 @@ async def ejecutar(peticion: PeticionEjecutarProyeccion):
             kpis=resultado["kpis"],
             df_detalle=df_detalle_dict
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except ErrorValidacionProyeccion as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error

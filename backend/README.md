@@ -24,9 +24,9 @@ A diferencia del ETL, que es un proceso pesado, en bloque (batch) y de larga dur
 
 Para correr el servidor de la API en tu entorno:
 
-1. Asegúrate de que las dependencias estén instaladas (`pip install -r requirements.txt`).
-2. Levanta el servidor con Uvicorn:
+1. Desde la raíz del proyecto, instalar una vez con `python instalar.py`. API, runner y ETL comparten dependencias y el `.env` raíz.
+2. Arrancar desde la raíz:
    ```bash
-   uvicorn main:app --reload
+   python acp_start.py
    ```
-3. Explora la documentación automática de la API accediendo a `http://localhost:8000/docs`.
+3. El puerto se configura con `ACP_PUERTO` (8810 por defecto). Para solo API mantener `ACP_RUNNER_ACTIVO=false`. `backend/requirements.txt` redirige a la lista global por compatibilidad.

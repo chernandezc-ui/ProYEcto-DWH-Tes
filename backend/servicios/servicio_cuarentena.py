@@ -9,6 +9,7 @@ Emite señales Blinker al EventBus al resolver/rechazar.
 from __future__ import annotations
 
 import asyncio
+import json
 
 from nucleo.cache import cache
 from nucleo.excepciones import ErrorRecursoNoEncontrado
@@ -26,8 +27,9 @@ _CACHE_PREFIJO_CUARENTENA = "cuarentena:"
 _CLAVE_CACHE_RESUMEN = "cuarentena:resumen"
 
 
-def _clave_cache_listar(pagina: int, tamano: int, tabla_filtro: str | None) -> str:
-    return f"cuarentena:listar:p{pagina}:t{tamano}:f{tabla_filtro or 'todos'}"
+def _clave_cache_listar(pagina: int, tamano: int, tabla_filtro: str | None, estado_filtro: str | None) -> str:
+    # La tupla distingue None, textos literales y separadores dentro de filtros.
+    return "cuarentena:listar:" + json.dumps([pagina, tamano, tabla_filtro, estado_filtro], ensure_ascii=False)
 
 
 async def listar_cuarentena(
@@ -37,7 +39,7 @@ async def listar_cuarentena(
     estado_filtro: str | None = "PENDIENTE",
 ) -> dict:
     """Read-through cache: TTL corto para reducir presion sobre MDM.Cuarentena."""
-    clave = _clave_cache_listar(pagina, tamano, tabla_filtro)
+    clave = _clave_cache_listar(pagina, tamano, tabla_filtro, estado_filtro)
     cacheado = cache.obtener(clave)
     if cacheado is not None:
         return cacheado

@@ -15,6 +15,8 @@ NotImplementedError para evitar inserts incorrectos.
 """
 
 import re
+from typing import Any
+
 import pandas as pd
 from sqlalchemy.engine import Engine
 from sqlalchemy import text

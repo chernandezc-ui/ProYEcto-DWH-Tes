@@ -30,7 +30,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from utils.errores import ErrorCircuitBreakerCritico, ErrorCircuitBreakerError
+from utils import circuit_breaker
 from mdm.lookup import (
     obtener_parametros_pipeline,
     obtener_reglas_validacion,
@@ -48,9 +48,9 @@ _log = logging.getLogger("ETL_Pipeline")
 
 class BaseFactProcessor:
     # Niveles de calidad del circuit breaker (porcentaje de rechazo real sobre leídos)
-    LIMITE_WARNING  = 1.0   # Emite WARNING en log, continúa
-    LIMITE_ERROR    = 2.0   # Aborta el fact, bloquea Gold
-    LIMITE_CRITICO  = 5.0   # Aborta el pipeline completo
+    LIMITE_WARNING = circuit_breaker.UMBRAL_WARNING_DEFAULT
+    LIMITE_ERROR = circuit_breaker.UMBRAL_ERROR_DEFAULT
+    LIMITE_CRITICO = circuit_breaker.UMBRAL_CRITICO_DEFAULT
 
     def __init__(self, engine: Engine, tabla_origen: str, tabla_destino: str, columna_id: str = None):
         self.engine = engine
@@ -1044,7 +1044,14 @@ class BaseFactProcessor:
         unique_ids_rechazados = len(set(r['id'] for r in rechazos_reales))
         
         total_leidos = self.resumen.get('leidos', 0)
-        porcentaje_rechazo = (unique_ids_rechazados / total_leidos * 100) if total_leidos > 0 else 0
+        breaker = circuit_breaker.evaluar(
+            total_leidos, unique_ids_rechazados,
+            umbrales=circuit_breaker.UmbralesCircuitBreaker(
+                warning=self.LIMITE_WARNING, error=self.LIMITE_ERROR, critico=self.LIMITE_CRITICO,
+            ),
+            tabla=self.tabla_destino,
+        )
+        porcentaje_rechazo = breaker.porcentaje_rechazo
         
         # 4. Reporte final
         insertados_total = self.resumen.get('insertados', 0)
@@ -1065,58 +1072,14 @@ class BaseFactProcessor:
                 f"0 insertados y 0 rechazados. Revisar clave de grano / layout Bronce / Estado_Carga."
             )
 
-        # ── Circuit Breaker de calidad (NO-DESTRUCTIVO desde Bug 2 fix) ───────
-        #
-        # Bug 2 (corregido 2026-05-26): el breaker NO lanza la excepcion aqui.
-        # Si lo hiciera, la transaccion en curso (ContextoTransaccionalETL /
-        # engine.begin()) haria ROLLBACK y se perderian todas las filas ya
-        # insertadas en Silver (caso real: 459K filas de Vegetativa perdidas
-        # tras 9.5% rechazo). En su lugar, devolvemos el resultado en el
-        # payload de retorno y dejamos que el orquestador (pipeline._ejecutar_fact)
-        # lance la excepcion DESPUES de commit. Asi se preserva Silver y el
-        # contrato externo (abort de Gold/pipeline) se mantiene.
-        #
-        # Muestra minima: con < 50 filas leidas, 1 rechazo ya dispara umbrales
-        # estadisticamente irrelevantes (ej. 1/18 = 5.6% > 5% CRITICO). Ignorar.
-        MIN_MUESTRA_BREAKER = 50
-        nivel_bloqueo = None
-        mensaje_breaker = None
-        if total_leidos >= MIN_MUESTRA_BREAKER:
-            if porcentaje_rechazo >= self.LIMITE_CRITICO:
-                nivel_bloqueo = "CRITICO"
-                mensaje_breaker = (
-                    f"Circuit breaker CRITICO en {self.tabla_destino}: "
-                    f"{porcentaje_rechazo:.1f}% de rechazo ({unique_ids_rechazados}/{total_leidos}). "
-                    f"Umbral crítico: {self.LIMITE_CRITICO}%."
-                )
-                _log.error(
-                    f"[CIRCUIT BREAKER CRITICO] {self.tabla_destino}: "
-                    f"{porcentaje_rechazo:.1f}% rechazo >= {self.LIMITE_CRITICO}% — "
-                    f"Silver preservado (no-rollback). Pipeline downstream sera abortado."
-                )
-            elif porcentaje_rechazo >= self.LIMITE_ERROR:
-                nivel_bloqueo = "ERROR"
-                mensaje_breaker = (
-                    f"Circuit breaker ERROR en {self.tabla_destino}: "
-                    f"{porcentaje_rechazo:.1f}% de rechazo ({unique_ids_rechazados}/{total_leidos}). "
-                    f"Umbral de error: {self.LIMITE_ERROR}%."
-                )
-                _log.error(
-                    f"[CIRCUIT BREAKER ERROR] {self.tabla_destino}: "
-                    f"{porcentaje_rechazo:.1f}% rechazo >= {self.LIMITE_ERROR}% — "
-                    f"Silver preservado (no-rollback). Fact marcado, Gold bloqueado."
-                )
-            elif porcentaje_rechazo >= self.LIMITE_WARNING:
-                nivel_bloqueo = "WARNING"
-                mensaje_breaker = (
-                    f"Circuit breaker WARNING en {self.tabla_destino}: "
-                    f"{porcentaje_rechazo:.1f}% rechazo >= {self.LIMITE_WARNING}%."
-                )
-                _log.warning(
-                    f"[CIRCUIT BREAKER WARNING] {self.tabla_destino}: "
-                    f"{porcentaje_rechazo:.1f}% rechazo >= {self.LIMITE_WARNING}% — "
-                    f"continúa, pero revisar calidad."
-                )
+        # Evaluar nunca hace commit, rollback ni lanza por severidad. El flujo
+        # incremental decide después del commit; el reproceso atómico decide
+        # antes del commit externo para conservar la fact anterior al fallar.
+        if breaker.nivel:
+            _log.log(
+                logging.WARNING if breaker.nivel == 'WARNING' else logging.ERROR,
+                "[CIRCUIT BREAKER %s] %s", breaker.nivel, breaker.mensaje,
+            )
 
         return {
             'Tabla_Destino': self.tabla_destino,
@@ -1124,13 +1087,13 @@ class BaseFactProcessor:
             'Filas_Insertadas': self.resumen.get('insertados', 0),
             'Nuevos_Casos_Cuarentena': unique_ids_rechazados,
             'cuarentena': self.resumen.get('cuarentena', []),
-            'Bloqueo_Integridad': nivel_bloqueo == "WARNING",
+            'Bloqueo_Integridad': breaker.nivel == "WARNING",  # Contrato legado, conservar compatibilidad
             'Dependencias_Incumplidas': [],
             'resueltos_por_tiebreaker': self.resumen.get('resueltos_por_tiebreaker', 0),
             'posible_perdida_silenciosa': posible_perdida_silenciosa,
-            # ── Bug 2: el orquestador lanza fuera de transaccion ──
-            'breaker_nivel': nivel_bloqueo,
-            'breaker_mensaje': mensaje_breaker,
+            # El llamador aplica el dictamen a su límite transaccional.
+            'breaker_nivel': breaker.nivel,
+            'breaker_mensaje': breaker.mensaje if breaker.nivel else None,
             'breaker_porcentaje': porcentaje_rechazo,
             'breaker_total_leidos': total_leidos,
             'breaker_rechazados': unique_ids_rechazados,

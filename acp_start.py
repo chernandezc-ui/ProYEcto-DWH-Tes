@@ -1,32 +1,21 @@
 """
 ACP Platform - Lanzador Unificado
-Doble clic en acp_start.bat o ejecutar: python acp_start.py
+Doble clic en INICIAR ACP.bat o ejecutar: python acp_start.py
 """
 
+import argparse
 import subprocess
 import sys
 import os
 import time
 
-from dotenv import load_dotenv
 import signal
-import threading
 import urllib.request
 import urllib.error
-import webbrowser
-import ctypes
 import logging
 import logging.handlers
 from pathlib import Path
 from datetime import datetime
-
-# ─── Colores ANSI ───────────────────────────────────────────────────────────
-# Activar colores en Windows 10+
-if sys.platform == "win32":
-    ctypes.windll.kernel32.SetConsoleMode(
-        ctypes.windll.kernel32.GetStdHandle(-11), 7
-    )
-    sys.stdout.reconfigure(encoding='utf-8')
 
 RESET  = "\033[0m"
 BOLD   = "\033[1m"
@@ -40,84 +29,50 @@ WHITE  = "\033[97m"
 BG_BLUE = "\033[44m"
 
 # ─── Configuración de servicios ──────────────────────────────────────────────
-BASE = Path(__file__).parent
-VENV = BASE / ".venv" / "Scripts"
+BASE = Path(__file__).resolve().parent
+SERVICIOS = []
 
-# Puertos por defecto alejados de 8000/8501 (muy usados por otras apps).
-load_dotenv(BASE / "backend" / ".env")
-load_dotenv(BASE / ".env")
-_PUERTO_BACKEND = int(os.getenv("ACP_PUERTO", "8810"))
-# Portal NextJS (reemplaza el Streamlit legacy de acp_mdm_portal).
-# Override con ACP_NEXTJS_PORT si el 3000 está ocupado por otro proyecto.
-_PUERTO_NEXTJS = int(os.getenv("ACP_NEXTJS_PORT", "3000"))
-_DIR_NEXTJS = BASE / "Portal_MDM_NEXTJS" / "Portal-Nextjs" / "portal-mdm"
 
-SERVICIOS = [
-    {
-        "nombre":   "Backend FastAPI",
-        "icono":    "⚙",
-        "cmd":      [str(VENV / "uvicorn.exe"), "main:aplicacion",
-                     "--host", "0.0.0.0", "--port", str(_PUERTO_BACKEND)],
-        "cwd":      BASE / "backend",
-        "health":   f"http://127.0.0.1:{_PUERTO_BACKEND}/health/live",
-        "url":      f"http://localhost:{_PUERTO_BACKEND}/docs",
-        # IMPORTANTE: nombre distinto del log interno del backend
-        # (backend/nucleo/logging.py escribe a backend/logs/backend.log con
-        # RotatingFileHandler). Compartir archivo causa file-locking en
-        # Windows y el backend nunca llega a inicializarse.
-        "log":      BASE / "backend" / "logs" / "backend.stdout.log",
-        "puerto":   _PUERTO_BACKEND,
-        "color":    BLUE,
-        "proceso":  None,
-    },
-    {
-        "nombre":   "Runner ETL",
-        "icono":    "⚡",
-        "cmd":      [str(VENV / "python.exe"), "-m", "runner.runner"],
-        "cwd":      BASE / "backend",
-        "health":   None,
-        "url":      None,
-        "log":      BASE / "backend" / "logs" / "runner.stdout.log",
-        "puerto":   None,
-        "color":    YELLOW,
-        "proceso":  None,
-    },
-    {
-        "nombre":   "Portal NextJS",
-        "icono":    "🌐",
-        # Invocamos directamente `node` con el entrypoint JS de Next en
-        # vez de `npm run dev`. Evita la capa intermedia de cmd.exe que
-        # rompe la propagación de CTRL_BREAK_EVENT al apagar.
-        "cmd":      ["node",
-                     str(_DIR_NEXTJS / "node_modules" / "next" / "dist" / "bin" / "next"),
-                     "dev", "-p", str(_PUERTO_NEXTJS)],
-        "cwd":      _DIR_NEXTJS,
-        # NextJS no expone /health en dev. El root sirve como liveness:
-        # devuelve 200 (página) o 307/308 (redirect a /login según RBAC),
-        # ambos < 500.
-        "health":   f"http://127.0.0.1:{_PUERTO_NEXTJS}/",
-        "url":      f"http://localhost:{_PUERTO_NEXTJS}",
-        "log":      BASE / "backend" / "logs" / "portal-nextjs.stdout.log",
-        "puerto":   _PUERTO_NEXTJS,
-        "color":    CYAN,
-        "proceso":  None,
-    },
-]
+def construir_servicios(config):
+    """API y runner comparten Python, .env y dependencias; siguen aislados por proceso."""
+    command = [sys.executable, '-m', 'uvicorn', 'main:aplicacion',
+               '--host', config.host, '--port', str(config.puerto)]
+    if config.reload:
+        command.append('--reload')
+    elif config.workers != 1:
+        command.extend(['--workers', str(config.workers)])
+    services = [{
+        'nombre': 'Backend FastAPI', 'icono': '⚙', 'color': BLUE,
+        'cmd': command,
+        'cwd': BASE / 'backend',
+        'health': f'http://127.0.0.1:{config.puerto}/health/live',
+        'url': f'http://localhost:{config.puerto}/docs',
+        'log': BASE / 'backend/logs/backend.stdout.log',
+        'puerto': config.puerto, 'proceso': None,
+    }]
+    if config.runner_activo:
+        if config.db_driver == 'ACP_OFFLINE_NO_DATABASE':
+            raise ValueError('ACP_RUNNER_ACTIVO requiere configurar una conexión SQL Server real.')
+        services.append({
+            'nombre': 'Runner ETL', 'icono': '⚡', 'color': YELLOW,
+            'cmd': [sys.executable, '-m', 'runner.runner'],
+            'cwd': BASE / 'backend', 'health': None, 'url': None,
+            'log': BASE / 'backend/logs/runner.stdout.log',
+            'puerto': None, 'proceso': None,
+        })
+    return services
+
 
 PROCESOS_ACTIVOS = []  # para cleanup en Ctrl+C
 
 # ─── Helpers de UI ───────────────────────────────────────────────────────────
 
-def limpiar():
-    os.system("cls" if sys.platform == "win32" else "clear")
-
-
-def banner():
+def banner(entorno):
     print(f"""
 {BOLD}{BG_BLUE}                                                        {RESET}
 {BOLD}{BG_BLUE}    ACP PLATFORM  -  Lanzador Unificado de Servicios    {RESET}
 {BOLD}{BG_BLUE}                                                        {RESET}
-{DIM}    Proyecto: ACP Data Warehouse | Entorno: DEV          {RESET}
+{DIM}    Proyecto: ACP Data Warehouse | Entorno: {entorno}          {RESET}
 """)
 
 
@@ -149,19 +104,20 @@ def _crear_log_rotativo(ruta: Path):
 
 
 # Logger del propio lanzador (separado de los subprocesos)
-_DIR_LOGS_LAUNCHER = BASE / "backend" / "logs"
-_DIR_LOGS_LAUNCHER.mkdir(parents=True, exist_ok=True)
-_launcher_log = logging.getLogger("acp_start")
-_launcher_log.setLevel(logging.INFO)
-if not _launcher_log.handlers:
-    _h = logging.handlers.RotatingFileHandler(
-        filename=_DIR_LOGS_LAUNCHER / "launcher.log",
-        maxBytes=10 * 1024 * 1024,
-        backupCount=5,
-        encoding="utf-8",
-    )
-    _h.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
-    _launcher_log.addHandler(_h)
+_launcher_log = logging.getLogger('acp_start')
+
+
+def configurar_log_lanzador():
+    directory = BASE / 'backend/logs'
+    directory.mkdir(parents=True, exist_ok=True)
+    _launcher_log.setLevel(logging.INFO)
+    if not _launcher_log.handlers:
+        handler = logging.handlers.RotatingFileHandler(
+            directory / 'launcher.log', maxBytes=10 * 1024 * 1024,
+            backupCount=5, encoding='utf-8',
+        )
+        handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
+        _launcher_log.addHandler(handler)
 
 
 def puerto_en_uso(puerto: int) -> bool:
@@ -181,8 +137,8 @@ def health_check(url: str, intentos: int = 1, timeout: float = 3.0) -> bool:
     """
     for _ in range(intentos):
         try:
-            req = urllib.request.urlopen(url, timeout=timeout)
-            return req.status < 500
+            with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(url, timeout=timeout) as response:
+                return response.status < 500
         except Exception:
             if intentos > 1:
                 time.sleep(0.5)
@@ -191,83 +147,14 @@ def health_check(url: str, intentos: int = 1, timeout: float = 3.0) -> bool:
 
 # ─── Inicio de servicios ─────────────────────────────────────────────────────
 
-def _pid_en_puerto(puerto: int) -> str | None:
-    """Devuelve el PID (como str) que escucha en el puerto, o None."""
-    try:
-        r = subprocess.run(["netstat", "-ano"], capture_output=True, text=True)
-        for line in r.stdout.splitlines():
-            if f":{puerto} " in line and "LISTENING" in line:
-                pid = line.strip().split()[-1]
-                if pid.isdigit() and pid != "0":
-                    return pid
-    except Exception:
-        pass
-    return None
-
-
-def _liberar_puerto(puerto: int) -> tuple[bool, str | None]:
-    """
-    Intenta matar el proceso huérfano que ocupa el puerto.
-
-    Retorna (liberado, pid_intentado). `liberado=False` puede pasar si el
-    proceso corre con privilegios distintos (SYSTEM, admin) y taskkill
-    no tiene permisos. En ese caso el caller debe abortar, NO continuar
-    como si todo estuviera bien.
-    """
-    pid = _pid_en_puerto(puerto)
-    if pid is None:
-        return True, None
-    try:
-        r = subprocess.run(
-            ["taskkill", "/F", "/PID", pid],
-            capture_output=True,
-            text=True,
-        )
-        time.sleep(0.5)
-        # Verificar que realmente murió — taskkill puede retornar 0 y dejar
-        # el proceso vivo si el SO lo respawnea, o retornar !=0 silenciosamente
-        # cuando no hay permisos.
-        if _pid_en_puerto(puerto) == pid:
-            log(
-                f"Falló taskkill PID {pid} en puerto {puerto}"
-                f" (rc={r.returncode}): {r.stderr.strip() or r.stdout.strip()}",
-                "ERR",
-            )
-            return False, pid
-        log(f"Proceso huérfano {pid} en puerto {puerto} terminado", "WARN")
-        return True, pid
-    except Exception as exc:
-        log(f"Excepción liberando puerto {puerto}: {exc}", "ERR")
-        return False, pid
-
-
 def iniciar_servicio(svc: dict) -> bool:
     nombre = svc["nombre"]
     color  = svc["color"]
 
-    # Verificar si puerto ya está en uso; si es así, liberar el proceso huérfano.
-    # Si NO logramos liberar (perms insuficientes, respawn), abortamos este
-    # servicio — antes retornábamos True silenciosamente y la app simulaba
-    # estar corriendo, lo que enmascaraba el fallo y daba 0 trazas.
-    if svc["puerto"] and puerto_en_uso(svc["puerto"]):
-        liberado, pid_intentado = _liberar_puerto(svc["puerto"])
-        if not liberado:
-            log(
-                f"{color}{nombre}{RESET}  puerto {svc['puerto']} ocupado por PID"
-                f" {pid_intentado} y NO se pudo liberar. Pasos a probar:",
-                "ERR",
-            )
-            log(
-                f"  1) Abrir PowerShell como Administrador y correr:"
-                f"  Stop-Process -Id {pid_intentado} -Force",
-                "ERR",
-            )
-            log(
-                f"  2) O cambiar el puerto del servicio en .env"
-                f" (var de entorno asociada)",
-                "ERR",
-            )
-            return False
+    # El lanzador solo administra sus propios procesos.
+    if svc['puerto'] and puerto_en_uso(svc['puerto']):
+        log(f"{nombre}: puerto ocupado. Cambia ACP_PUERTO en el .env global.", 'ERR')
+        return False
 
     # Crear carpeta de logs
     svc["log"].parent.mkdir(parents=True, exist_ok=True)
@@ -334,51 +221,6 @@ def esperar_health(svc: dict, timeout: int = 30) -> bool:
             time.sleep(1.0)
 
 
-def esperar_health_paralelo(servicios: list[dict], timeout: int = 35) -> dict[str, bool]:
-    """
-    Lanza health checks de todos los servicios en paralelo.
-
-    Imprime el resultado de cada uno en orden tan pronto como termina,
-    así la salida sigue siendo legible. El tiempo total = max(tiempos)
-    en lugar de sum(tiempos) que es lo que daba el bucle secuencial.
-    """
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-
-    # Pre-imprime la línea de espera para cada servicio (en orden).
-    for svc in servicios:
-        nombre = svc["nombre"]
-        color = svc["color"]
-        print(
-            f"  {DIM}         Esperando {color}{nombre}{RESET}"
-            f"{DIM} (max {timeout}s)...{RESET}"
-        )
-
-    resultados: dict[str, bool] = {}
-    with ThreadPoolExecutor(max_workers=len(servicios)) as pool:
-        inicios = {svc["nombre"]: time.perf_counter() for svc in servicios}
-        futuros = {pool.submit(esperar_health, svc, timeout): svc for svc in servicios}
-        for fut in as_completed(futuros):
-            svc = futuros[fut]
-            ok = False
-            try:
-                ok = fut.result()
-            except Exception as exc:
-                log(f"Error en health check de {svc['nombre']}: {exc}", "ERR")
-            resultados[svc["nombre"]] = ok
-            secs = time.perf_counter() - inicios[svc["nombre"]]
-            estado = (
-                f"{GREEN}OK ({secs:.1f}s){RESET}"
-                if ok
-                else (
-                    f"{RED}FALLO{RESET}"
-                    if svc["proceso"] and svc["proceso"].poll() is not None
-                    else f"{YELLOW}TIMEOUT ({secs:.1f}s){RESET}"
-                )
-            )
-            print(f"  {DIM}         → {svc['color']}{svc['nombre']}{RESET}  {estado}")
-    return resultados
-
-
 # ─── Dashboard de estado ─────────────────────────────────────────────────────
 
 def mostrar_estado():
@@ -411,22 +253,24 @@ def mostrar_estado():
 # ─── Apagado limpio ──────────────────────────────────────────────────────────
 
 def detener_todo():
-    log("Deteniendo todos los servicios...", "INFO")
-    for proc, handler in PROCESOS_ACTIVOS:
+    owned = list(PROCESOS_ACTIVOS)
+    PROCESOS_ACTIVOS.clear()
+    for proc, handler in owned:
         try:
-            if sys.platform == "win32":
-                proc.send_signal(signal.CTRL_BREAK_EVENT)
-            else:
-                proc.terminate()
-            proc.wait(timeout=5)
-        except Exception:
-            proc.kill()
+            if proc.poll() is None:
+                if sys.platform == 'win32':
+                    proc.send_signal(signal.CTRL_BREAK_EVENT)
+                else:
+                    proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait(timeout=5)
         finally:
-            try:
-                handler.close()
-            except Exception:
-                pass
-    log("Servicios detenidos.", "OK")
+            handler.close()
+    if owned:
+        log('Servicios detenidos.', 'OK')
 
 
 def handler_sigint(sig, frame):
@@ -436,7 +280,6 @@ def handler_sigint(sig, frame):
     sys.exit(0)
 
 
-signal.signal(signal.SIGINT, handler_sigint)
 
 # ─── Menú interactivo ────────────────────────────────────────────────────────
 
@@ -492,56 +335,61 @@ def mostrar_logs(lineas: int = 15):
 # ─── Flujo principal ─────────────────────────────────────────────────────────
 
 def arrancar_servicios():
-    print()
-    for svc in SERVICIOS:
-        iniciar_servicio(svc)
-
-    print()
-    linea()
-    print(f"  {BOLD}Verificando health checks (en paralelo)...{RESET}\n")
-
-    resultados = esperar_health_paralelo(SERVICIOS, timeout=35)
-
-    print()
-    linea()
-    print()
+    api = SERVICIOS[0]
+    if not iniciar_servicio(api) or not esperar_health(api):
+        log('El backend no inició; revisar backend/logs/backend.stdout.log.', 'ERR')
+        return False
+    for service in SERVICIOS[1:]:
+        ready = {**api, 'health': api['health'].replace('/health/live', '/health/ready')}
+        if not esperar_health(ready):
+            log('SQL Server no está listo; el runner no se inicia.', 'ERR')
+            return False
+        if not iniciar_servicio(service) or not esperar_health(service):
+            log('El runner no inició; revisar backend/logs/runner.stdout.log.', 'ERR')
+            return False
     mostrar_estado()
-
-    # Abrir navegador solo si los servicios críticos levantaron
-    if resultados.get("Backend FastAPI") and resultados.get("Portal NextJS"):
-        log("Abriendo navegador...", "INFO")
-        time.sleep(1)
-        webbrowser.open(f"http://localhost:{_PUERTO_NEXTJS}")
-    elif resultados.get("Backend FastAPI"):
-        webbrowser.open(f"http://localhost:{_PUERTO_BACKEND}/docs")
-    else:
-        log("Algunos servicios no respondieron. Revisa los logs.", "WARN")
+    return True
 
 
 def main():
-    limpiar()
-    banner()
+    parser = argparse.ArgumentParser(description='Arranque único de API y runner con el .env global.')
+    parser.add_argument('--comprobar', action='store_true', help='Arrancar, comprobar y cerrar los servicios propios')
+    parser.add_argument('--sin-interaccion', action='store_true', help='Mantener servicios activos sin menú')
+    args = parser.parse_args()
+    if sys.platform == 'win32':
+        sys.stdout.reconfigure(encoding='utf-8')
+    if sys.prefix == sys.base_prefix:
+        python = BASE / '.venv' / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
+        if not python.exists():
+            print('Primero ejecuta: python instalar.py')
+            return 1
+        os.execv(str(python), [str(python), str(Path(__file__).resolve()), *sys.argv[1:]])
 
-    # Verificar que el venv existe
-    if not VENV.exists():
-        print(f"  {RED}ERROR: No se encontró el entorno virtual en:{RESET}")
-        print(f"  {DIM}{VENV}{RESET}")
-        print(f"\n  {YELLOW}Crea el venv con:{RESET}  python -m venv .venv")
-        print(f"  {YELLOW}Instala deps con:{RESET}   .venv\\Scripts\\pip install -r requirements.txt\n")
-        input("  Presiona Enter para salir...")
-        sys.exit(1)
+    from backend.nucleo.settings import settings
 
-    # Verificar .env
-    env_raiz = BASE / ".env"
-    if not env_raiz.exists():
-        log("Archivo .env no encontrado en la raíz del proyecto.", "WARN")
+    try:
+        services = construir_servicios(settings)
+    except ValueError as error:
+        print(str(error))
+        return 1
+    SERVICIOS[:] = services
+    configurar_log_lanzador()
+    signal.signal(signal.SIGINT, handler_sigint)
+    signal.signal(signal.SIGTERM, handler_sigint)
+    banner(settings.entorno)
+    try:
+        if not arrancar_servicios():
+            return 1
+        if args.comprobar:
+            return 0
+        if args.sin_interaccion:
+            while all(proc.poll() is None for proc, _ in PROCESOS_ACTIVOS):
+                time.sleep(0.5)
+            return 1
+        menu()
+    finally:
+        detener_todo()
 
-    log("Iniciando ACP Platform...", "INFO")
-    print()
 
-    arrancar_servicios()
-    menu()
-
-
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    raise SystemExit(main())

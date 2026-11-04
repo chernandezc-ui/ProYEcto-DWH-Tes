@@ -60,21 +60,8 @@ class _PasoActivo:
 
 
 def _resolver_python() -> str:
-    """Resuelve el intérprete Python correcto dentro del venv activo."""
-    venv = os.environ.get("VIRTUAL_ENV")
-    if venv:
-        # Windows: Scripts/python.exe  |  Unix: bin/python
-        for candidato in (
-            Path(venv) / "Scripts" / "python.exe",
-            Path(venv) / "bin" / "python",
-        ):
-            if candidato.exists():
-                return str(candidato)
-    # Fallback: uvicorn wrapper — tomar el python del mismo directorio
-    exe = sys.executable
-    if "uvicorn" in exe.lower():
-        return str(Path(exe).parent / "python.exe")
-    return exe
+    """El ETL usa exactamente el intérprete y dependencias del runner."""
+    return sys.executable
 
 
 def _normalizar_nombre_paso(descripcion: str) -> str:

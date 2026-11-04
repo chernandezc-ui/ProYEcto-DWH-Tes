@@ -129,7 +129,7 @@ async def test_projection_separates_fundos_and_keeps_ids(monkeypatch):
     weights = pd.DataFrame([dict(id_fundo=1, modulo=1, variedad='V', semana_iso=2, peso_baya_kg=.002),
                             dict(id_fundo=2, modulo=1, variedad='V', semana_iso=2, peso_baya_kg=.004)])
     monkeypatch.setattr(repo, 'extraer_datos_granulares', lambda *args: (counts, plants, weights))
-    save = Mock()
+    save = Mock(return_value={'insertados': 12, 'saltados': 0, 'errores': []})
     monkeypatch.setattr(repo, 'guardar_proyeccion', save)
     result = await service.ejecutar_proyeccion(20260101)
     detail = result['df_detalle']
