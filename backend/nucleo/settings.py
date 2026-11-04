@@ -3,51 +3,44 @@ nucleo/settings.py
 ==================
 Configuración formal del backend ACP Platform.
 
-Fuente única de verdad para TODAS las variables de entorno.
-Ningún otro módulo debe llamar os.getenv() directamente.
+Configuración del backend; hereda el contrato de conexión de comun/configuracion.py.
+Ambos leen únicamente el .env raíz y las variables del proceso.
 
 Perfiles:
     dev   — recarga automática, logging verboso, CORS amplio
-    test  — usa SQLite mock, no conecta a SQL Server real
+    test  — perfil de pruebas; por sí solo no sustituye SQL Server
     prod  — sin reload, logging JSON compacto, CORS estricto
 
 Orden de carga (del menos al más prioritario):
-    1. .env en raíz del backend
-    2. .env en directorio padre (proyecto)
-    3. Variables de sistema del SO
+    1. .env en la raíz del proyecto
+    2. Variables de sistema del SO
+    3. Parámetros explícitos al construir Settings
 """
 
 from __future__ import annotations
 
-import os
 import sys
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, ValidationError, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
-_DIR_BACKEND = Path(__file__).resolve().parents[1]
-_DIR_PROYECTO = _DIR_BACKEND.parent
+# Compatibilidad con el arranque directo desde backend/ sin instalar paquetes.
+_DIR_PROYECTO = Path(__file__).resolve().parents[2]
+if str(_DIR_PROYECTO) not in sys.path:
+    sys.path.insert(0, str(_DIR_PROYECTO))
+
+from comun.configuracion import ConfiguracionBD, RAIZ_PROYECTO
+
+_DIR_PROYECTO = RAIZ_PROYECTO
 
 
-class Settings(BaseSettings):
+class Settings(ConfiguracionBD):
     """
     Configuración centralizada del backend.
     Todas las variables tienen valores por defecto seguros para desarrollo.
     """
-
-    model_config = SettingsConfigDict(
-        # Busca .env en el backend primero, luego en el proyecto padre
-        env_file=[
-            str(_DIR_BACKEND / ".env"),
-            str(_DIR_PROYECTO / ".env"),
-        ],
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="ignore",          # ignora vars del SO que no son nuestras
-    )
 
     # ── Entorno ────────────────────────────────────────────────────────────────
     entorno: Literal["dev", "test", "prod"] = Field(
@@ -56,34 +49,12 @@ class Settings(BaseSettings):
         description="Perfil de ejecución: dev | test | prod",
     )
 
-    # ── Base de datos ──────────────────────────────────────────────────────────
-    db_servidor: str = Field(
-        alias="DB_SERVIDOR",
-        description="IP o Hostname del SQL Server",
-    )
-    db_nombre: str = Field(
-        alias="DB_NOMBRE",
-        description="Nombre de la Base de Datos DWH",
-    )
-    db_usuario: str | None = Field(
-        default=None,
-        alias="DB_USUARIO",
-        description="Vacío = Windows Auth (Trusted_Connection)",
-    )
-    db_clave: str | None = Field(
-        default=None,
-        alias="DB_CLAVE",
-    )
-    db_driver: str = Field(
-        default="ODBC Driver 17 for SQL Server",
-        alias="DB_DRIVER",
-    )
-
     # ── Servidor ───────────────────────────────────────────────────────────────
     host: str = Field(default="0.0.0.0", alias="ACP_HOST")
     puerto: int = Field(default=8810, alias="ACP_PUERTO")
     workers: int = Field(default=1, alias="ACP_WORKERS")
     reload: bool = Field(default=False, alias="ACP_RELOAD")
+    runner_activo: bool = Field(default=False, alias="ACP_RUNNER_ACTIVO")
 
     # ── CORS ───────────────────────────────────────────────────────────────────
     cors_origenes: list[str] = Field(
@@ -132,6 +103,7 @@ class Settings(BaseSettings):
         alias="ACP_JWT_SECRETO",
         description="Clave HMAC para firmar JWT. OBLIGATORIO.",
         min_length=32,
+        repr=False,
     )
     jwt_ttl_min: int = Field(
         default=480,   # 8 horas
@@ -196,8 +168,8 @@ def obtener_settings() -> Settings:
             print(f"  \033[33m[ FALTA ]\033[0m {campo}: {msg}")
             
         print("\n\033[36mSOLUCIÓN:\033[0m")
-        print("  1. Abre (o crea) el archivo 'backend/.env'")
-        print("  2. Usa 'backend/.env.template' como guía.")
+        print("  1. Abre (o crea) el archivo '.env' en la raíz del proyecto")
+        print("  2. Usa '.env.example' como guía o ejecuta python instalar.py.")
         print("  3. Asegúrate de definir DB_SERVIDOR, DB_NOMBRE y ACP_JWT_SECRETO.")
         print("\n" + "!" * 80 + "\n")
         sys.exit(1)

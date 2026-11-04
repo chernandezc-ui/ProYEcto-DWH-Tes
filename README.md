@@ -17,34 +17,37 @@ El sistema está dividido en tres componentes principales que trabajan en cadena
    [Leer más sobre el Backend](./backend/README.md)
 
 3. **Portal MDM (Centro de Control)**
-   Una interfaz web moderna construida con Next.js y React. Actúa como el centro de mando donde los usuarios pueden visualizar tableros de control, auditar los datos procesados, gestionar registros en cuarentena y ejecutar simulaciones de proyecciones.
-   [Leer más sobre el Portal](./Portal_MDM_NEXTJS/README.md)
+   El frontend Next.js mencionado en documentos históricos no está incluido en este checkout. El lanzador prepara los componentes Python presentes: API y runner del ETL.
 
 ## Guía de Inicio Rápido
 
 Para ejecutar las pruebas locales sin SQL Server y habilitar integración solo
 con un destino aislado, consulta la [guía de pruebas](docs/pruebas-locales.md).
 
-Para levantar el ecosistema completo en tu entorno local de forma rápida, puedes utilizar los scripts automatizados ubicados en la raíz del proyecto.
+La API, el runner, el ETL y las pruebas comparten **un entorno virtual, un requirements.txt y un .env en la raíz**.
 
 ### Requisitos Previos
-- Python 3.9 o superior.
-- Node.js 18 o superior.
+- Python 3.10 o superior (validado en Python 3.12).
 - Git instalado.
 
 ### Pasos para Ejecutar
-1. **Inicializar todo el entorno:** 
-   Simplemente ejecuta el script por lotes que configurará las variables de entorno, levantará el Backend y preparará el ETL:
-   ```cmd
-   INICIAR ACP.bat
+1. Instalar una vez, desde la raíz:
+   ```bash
+   python instalar.py
    ```
+   Reutiliza el entorno virtual activo o crea `.venv`. Instala la lista global y crea `.env` solo si no existe, con una clave JWT local aleatoria y configuración inicial sin BD. No sobrescribe valores existentes.
 
-2. **Ejecutar el pipeline de datos:**
-   Si deseas procesar nuevos archivos o correr el ETL desde cero:
-   ```cmd
-   ejecutar_etl_acp.bat
+2. Arrancar desde la misma raíz:
+   ```bash
+   python acp_start.py
    ```
+   Selecciona `.venv` automáticamente si se invoca con Python del sistema; con un entorno virtual activo conserva ese intérprete. En Windows también se puede usar `INICIAR ACP.bat`.
 
-3. **Acceder al sistema:**
-   Una vez que los servicios estén corriendo, el portal web y la API estarán disponibles en tus puertos locales (usualmente `localhost:3000` para el Portal y `localhost:8000` para el Backend).
+3. Para conectar SQL Server, editar únicamente el `.env` global: `DB_*`, `ACP_ENTORNO=dev` y `ACP_RUNNER_ACTIVO=true`. El driver ODBC y la instancia SQL son requisitos externos a pip. El runner arranca después de comprobar conectividad de la API a la BD; no se ejecutan migraciones automáticamente.
+
+La API usa el puerto definido por `ACP_PUERTO` (8810 por defecto). `python acp_start.py --comprobar` arranca, comprueba liveness y cierra los procesos propios; `--sin-interaccion` mantiene los servicios sin menú. Con la configuración sin BD, readiness devuelve 503 y el runner permanece deshabilitado.
+
+Las variables del sistema tienen prioridad sobre `.env`. Los antiguos `.env` dentro de backend/ o ETL/ ya no se leen. Para trasladar una configuración existente, copiar sus valores al archivo raíz de forma local, sin compartir secretos ni versionarlo.
+
+Más detalles: [configuración global](docs/configuracion-global.md).
 # ProYEcto-DWH-Tes

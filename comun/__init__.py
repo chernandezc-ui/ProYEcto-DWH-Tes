@@ -10,6 +10,6 @@ Contiene SOLO utilidades que ambos lados consumen para evitar duplicacion:
 
 Reglas:
 - No depender de modulos especificos de ETL ni de backend.
-- Solo lee env vars con defaults seguros (sin pydantic / sin dotenv obligatorio).
+- Configuración tipada común desde el .env raíz y variables del entorno.
 - Todo singleton es per-process, thread-safe.
 """
