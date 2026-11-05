@@ -1,16 +1,3 @@
-"""
-comun/conexion.py
-=================
-Engine SQLAlchemy compartido por ETL y backend.
-
-Reemplaza dos implementaciones divergentes que existian:
-- ETL/config/conexion.py (singleton manual + os.getenv + pool tuned)
-- backend/nucleo/conexion.py (lru_cache + settings)
-
-Configuración canónica en comun/configuracion.py; un .env en la raíz y
-overrides explícitos para tests. Cada proceso conserva su propio pool.
-"""
-
 from __future__ import annotations
 
 import threading
