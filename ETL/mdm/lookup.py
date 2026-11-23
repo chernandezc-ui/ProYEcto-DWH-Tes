@@ -111,6 +111,9 @@ def limpiar_cache() -> None:
         n_mapas = len(_cache_mapas)
         _cache.clear()
         _cache_mapas.clear()
+        # Parámetros y reglas DQ también se recargan por corrida: sin esto un
+        # proceso de larga vida (API) arrastraba config de la corrida anterior.
+        _cache_config.clear()
     if n_dims or n_mapas:
         _log.debug(f'Cache de lookup limpiado: {n_dims} dims, {n_mapas} mapas descartados.')
 

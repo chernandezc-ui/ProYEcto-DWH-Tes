@@ -1,9 +1,12 @@
 """
 test_dedup_vectorizado.py
 ==========================
-Tests del fast-path vectorizado de _limpiar_duplicados_internos y de la
-normalización canónica de claves. Cubre los bugs detectados en la auditoría
+Tests de _limpiar_duplicados_internos (política "último timestamp gana") y de
+la normalización canónica de claves. Cubre los bugs detectados en la auditoría
 quirúrgica (NaT, tipos mixtos, None vs 'None', empates deterministas).
+
+Nota: la implementación actual es un único loop en Python; los tests de gran
+volumen validan resultado y no un camino de código distinto.
 
 Estos tests SÍ importan BaseFactProcessor real (no espejan la lógica).
 """
@@ -123,8 +126,7 @@ class TestNormalizacionClaves(unittest.TestCase):
 
 
 class TestFastPathVectorizado(unittest.TestCase):
-    """Verifica que el fast-path se active a partir de 10k filas y dé
-    resultados consistentes con el loop clásico."""
+    """Lotes grandes (10k+ filas): el resultado debe ser correcto y determinista."""
 
     def test_15k_filas_dedup_correcto(self):
         mp = _MockProc()

@@ -18,6 +18,7 @@ from sqlalchemy import text
 _log = logging.getLogger("ETL_Pipeline")
 
 from config.parametros import obtener_int as obtener_param_int
+from utils.ejecucion import CONFIG_FACTS
 
 # Escenario "Base" de proyecciones: es el escenario oficial de producción.
 def _obtener_escenario_base() -> int:
@@ -64,7 +65,36 @@ def _hay_fallas_criticas(
     """
     conjunto = facts_bloqueantes if facts_bloqueantes is not None else _FACTS_BLOQUEANTES_FALLBACK
     return [nombre for nombre in conjunto if f'{nombre} ERROR' in resumen_etl]
-def _truncar(conexion, mart: str) -> None:
+
+
+def marts_bloqueados_por_fallas(
+    facts_con_error: list[str] | tuple[str, ...] | set[str],
+    facts_bloqueantes: frozenset[str] | set[str] | tuple[str, ...] | None = None,
+) -> set[str]:
+    """
+    Marts que NO deben refrescarse porque una fact bloqueante que los alimenta falló.
+
+    - Un mart declarado en CONFIG_FACTS solo se bloquea si falló alguna de SUS facts.
+    - Un mart sin fact declarada (p. ej. Mart_Proyecciones, que mezcla varias
+      fuentes) no tiene dependencias explícitas: se bloquea ante cualquier falla
+      bloqueante (comportamiento conservador).
+    """
+    conjunto = set(facts_bloqueantes) if facts_bloqueantes is not None else set(_FACTS_BLOQUEANTES_FALLBACK)
+    fallidas = set(facts_con_error) & conjunto
+    if not fallidas:
+        return set()
+
+    marts_con_fact = {mart for meta in CONFIG_FACTS.values() for mart in meta.get('marts', ())}
+    bloqueados = {
+        mart
+        for nombre in fallidas
+        for mart in CONFIG_FACTS.get(nombre, {}).get('marts', ())
+    }
+    bloqueados |= {mart for mart in MARTS if mart not in marts_con_fact}
+    return bloqueados
+
+
+def _truncar(conexion, mart: str) -> None:
     # No-op: los marts ahora son vistas, no se truncan físicamente.
     pass
 
@@ -160,12 +190,14 @@ def refrescar_marts_seleccionados(
     marts: list[str] | tuple[str, ...],
     resumen_etl: dict | None = None,
     facts_bloqueantes: frozenset[str] | set[str] | None = None,
+    marts_omitidos: frozenset[str] | set[str] | None = None,
 ) -> dict:
     """
     Refresca solo los marts solicitados.
     facts_bloqueantes: conjunto activo del pipeline (desde DB); si None usa fallback local.
+    marts_omitidos: marts que no deben refrescarse (ver marts_bloqueados_por_fallas).
     """
-    marts_set = set(marts)
+    marts_set = set(marts) - set(marts_omitidos or ())
     marts_solicitados = [mart for mart in MARTS if mart in marts_set]
     if not marts_solicitados:
         return {}
@@ -194,10 +226,12 @@ def refrescar_todos_los_marts(
     engine: Engine,
     resumen_etl: dict | None = None,
     facts_bloqueantes: frozenset[str] | set[str] | None = None,
+    marts_omitidos: frozenset[str] | set[str] | None = None,
 ) -> dict:
     """
     Refresca todos los Marts Gold en orden. TRUNCATE + INSERT, siempre desde cero.
     facts_bloqueantes: conjunto activo del pipeline (desde DB); si None usa fallback local.
+    marts_omitidos: marts que no deben refrescarse (ver marts_bloqueados_por_fallas).
     """
     if resumen_etl is not None:
         fallas = _hay_fallas_criticas(resumen_etl, facts_bloqueantes)
@@ -207,12 +241,16 @@ def refrescar_todos_los_marts(
             return {'BLOQUEADO': msg}
 
     resumen = {}
+    omitidos = set(marts_omitidos or ())
 
     with engine.begin() as conexion:
         for mart in MARTS:
-            _truncar(conexion, mart)
+            if mart not in omitidos:
+                _truncar(conexion, mart)
 
         for mart, funcion in FUNCIONES_MARTS.items():
+            if mart in omitidos:
+                continue
             filas = funcion(conexion)
             resumen[mart] = filas
             _log.info('[OK] %s: %s filas', mart, filas)

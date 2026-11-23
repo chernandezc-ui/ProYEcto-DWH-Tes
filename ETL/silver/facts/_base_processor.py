@@ -621,7 +621,7 @@ class BaseFactProcessor:
         if not lista_dicts:
             return
 
-        _log.info(f"DEBUG: Comenzando _ejecutar_insercion_masiva_segura para {len(lista_dicts)} registros...")
+        _log.debug(f"Comenzando _ejecutar_insercion_masiva_segura para {len(lista_dicts)} registros...")
 
         # 0. Inyección automática de ID_Campana (Nueva Arquitectura)
         if any('ID_Campana' not in row for row in lista_dicts):
@@ -647,7 +647,7 @@ class BaseFactProcessor:
                 
                 lista_dicts.append(row)
 
-        _log.info("DEBUG: Inyección ID_Campana terminada. Iniciando limpieza duplicados internos...")
+        _log.debug("Inyección ID_Campana terminada. Iniciando limpieza duplicados internos...")
         # 1. Deduplicación interna en memoria (para evitar IntegrityError en el INSERT final)
         lista_dicts_limpia = self._limpiar_duplicados_internos(lista_dicts)
         
@@ -672,7 +672,7 @@ class BaseFactProcessor:
             for row in lista_dicts_limpia
         ]
 
-        _log.info("DEBUG: Conversión de tipos Python terminada. Listando cols y tipos SQL...")
+        _log.debug("Conversión de tipos Python terminada. Listando cols y tipos SQL...")
         conexion = contexto._conexion_activa()
         todas_cols = list(lista_dicts_limpia[0].keys())
 
@@ -708,8 +708,16 @@ class BaseFactProcessor:
         columnas_dest = [c for c in todas_cols if c != 'id_origen_rastreo' and not c.endswith('_Virtual') and not c.startswith('_') and c in columnas_reales]
 
         tiebreaker = getattr(self, 'columna_tiebreaker_timestamp', None)
+        if tiebreaker and tiebreaker not in columnas_reales:
+            # Sin columna homónima en destino no hay contra qué comparar: se usa
+            # el camino sin MERGE (duplicados externos se descartan).
+            _log.warning(
+                f"[{self.tabla_destino}] tiebreaker '{tiebreaker}' no existe en destino; "
+                f"se omite el MERGE 'último timestamp gana'."
+            )
+            tiebreaker = None
 
-        _log.info(f"DEBUG: Preparando inserción en chunks de 50000 para tabla real. Cols destino: {len(columnas_dest)}")
+        _log.debug(f"Preparando inserción en chunks de 50000 para tabla real. Cols destino: {len(columnas_dest)}")
         # Hacemos chunking físico (lotes de 50,000 registros) para evitar bloqueos y consumo excesivo en tempdb/SQL Server
         chunk_size = 50000
         for chunk_idx in range(0, len(lista_dicts_limpia), chunk_size):
@@ -717,7 +725,7 @@ class BaseFactProcessor:
             if not chunk_batch:
                 continue
 
-            _log.info(f"DEBUG: Ejecutando chunk {chunk_idx // chunk_size + 1}...")
+            _log.debug(f"Ejecutando chunk {chunk_idx // chunk_size + 1}...")
             # Asegurar de eliminar la tabla temporal por si quedó colgada de alguna iteración previa
             conexion.execute(text(f"IF OBJECT_ID('tempdb..{nombre_temp}') IS NOT NULL DROP TABLE {nombre_temp}"))
 
@@ -736,7 +744,7 @@ class BaseFactProcessor:
                     MERGE {self.tabla_destino} AS dest
                     USING {nombre_temp} AS src
                     ON ({clausula_on_src})
-                    WHEN MATCHED AND ISNULL(src.[{tiebreaker}], '19000101') > ISNULL(dest.[Fecha_Sistema], '19000101')
+                    WHEN MATCHED AND ISNULL(src.[{tiebreaker}], '19000101') > ISNULL(dest.[{tiebreaker}], '19000101')
                         THEN UPDATE SET {col_update}
                     WHEN NOT MATCHED BY TARGET
                         THEN INSERT ({col_insert_list}) VALUES ({col_values_list})

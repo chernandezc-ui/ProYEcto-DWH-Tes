@@ -10,6 +10,7 @@ Uso:
 """
 
 import argparse
+import json
 import sys
 from datetime import datetime
 
@@ -25,7 +26,6 @@ from bronce.cargador import ejecutar_carga_bronce
 from mdm.lookup import limpiar_cache as limpiar_lookup
 
 from silver.dims.dim_personal import cargar_dim_personal
-from silver.dims.dim_geografia import cargar_dim_geografia
 from silver.dims.dim_geografia_v2 import cargar_dim_geografia_v2
 
 from silver.facts.fact_cosecha_sap import cargar_fact_cosecha_sap
@@ -44,7 +44,12 @@ from silver.facts.fact_ciclo_poda import cargar_fact_ciclo_poda
 from silver.facts.fact_evaluacion_vegetativa import cargar_fact_evaluacion_vegetativa
 from silver.facts.fact_areas_plantas import cargar_fact_areas_plantas
 
-from gold.marts import refrescar_marts_seleccionados, refrescar_todos_los_marts
+from gold.marts import (
+    FUNCIONES_MARTS,
+    marts_bloqueados_por_fallas,
+    refrescar_marts_seleccionados,
+    refrescar_todos_los_marts,
+)
 from auditoria.log import registrar_inicio, registrar_fin
 from utils.ejecucion import (
     DEPENDENCIA_DIM_GEOGRAFIA,
@@ -92,6 +97,21 @@ class PrettyConsoleFormatter(logging.Formatter):
 
         return f"{color}[{ts}] [{record.levelname}] {msg}{reset}"
 
+class JsonLineFormatter(logging.Formatter):
+    """Una línea JSON válida por registro (escapa comillas, saltos de línea y tracebacks)."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        payload = {
+            "timestamp": self.formatTime(record),
+            "level": record.levelname,
+            "service": "acp-etl",
+            "message": record.getMessage(),
+        }
+        if record.exc_info:
+            payload["exception"] = self.formatException(record.exc_info)
+        return json.dumps(payload, ensure_ascii=False, default=str)
+
+
 def setup_etl_logger():
     logger = logging.getLogger("ETL_Pipeline")
     logger.setLevel(logging.INFO)
@@ -112,8 +132,7 @@ def setup_etl_logger():
         ts_nombre = datetime.now().strftime("%Y%m%d_%H%M%S")
         ruta_run = log_dir / f"etl_{ts_nombre}.json"
         file_handler = logging.FileHandler(ruta_run, mode='w', encoding='utf-8')
-        fmt = '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "service": "acp-etl", "message": "%(message)s"}'
-        file_handler.setFormatter(logging.Formatter(fmt))
+        file_handler.setFormatter(JsonLineFormatter())
         logger.addHandler(file_handler)
 
         # Enlace rápido etl_last_run.json → archivo más reciente
@@ -181,7 +200,10 @@ def _validar_tabla(tabla: str) -> None:
         raise ValueError(f"Tabla '{tabla}' no está en el catálogo de facts permitidos.")
 
 
-DEFAULT_CAMA_MIN_PERMITIDA = 0        # mínimo lógico de camas por geografía
+TOTAL_PASOS_COMPLETO = 14   # pasos que numera ejecutar(); ver llamadas a avanzar()
+MAX_WORKERS_FACTS = 4       # facts en paralelo (el trabajo real es E/S contra SQL Server)
+
+DEFAULT_CAMA_MIN_PERMITIDA = 0       # mínimo lógico de camas por geografía
 DEFAULT_CAMA_MAX_PERMITIDA = 100      # máximo operacional; valores mayores se rechazan
 DEFAULT_MAX_CAMAS_POR_GEOGRAFIA = 100  # límite de camas distintas permitidas por unidad geográfica
 DEFAULT_SP_CAMA_MODO_APLICAR = 1      # 1 = aplicar cambios en BD; 0 = dry-run solo lectura
@@ -247,11 +269,12 @@ def _cargar_configuracion_operativa() -> dict:
     }
 
 
-def _gold_debe_bloquearse(
+def _marts_omitidos(
     facts_con_error: list[str] | tuple[str, ...],
     facts_bloqueantes_gold: list[str] | tuple[str, ...],
-) -> bool:
-    return bool(set(facts_con_error).intersection(facts_bloqueantes_gold))
+) -> set[str]:
+    """Marts Gold que no deben refrescarse por fallas en facts bloqueantes que los alimentan."""
+    return marts_bloqueados_por_fallas(facts_con_error, facts_bloqueantes_gold)
 
 
 def _estado_calidad_cama_bloqueante(
@@ -366,7 +389,11 @@ def _ejecutar_sp_sincronizar_campanas(engine) -> None:
         conexion.execute(text("EXEC Silver.sp_Sincronizar_Periodos_Campana"))
 
 
-def _sincronizar_bridges_geografia(engine) -> None:
+def _sincronizar_bridges_geografia(engine) -> list[str]:
+    """Ejecuta los SPs de bridges. Cada SP es independiente: si uno falla se
+    sigue con el resto, pero TODAS las fallas se devuelven para que el
+    llamador las reporte (antes se perdían en un print)."""
+    fallas: list[str] = []
     sps = [
         "EXEC MDM.usp_Popular_Bridge_Geografia_Campana_Vegetativa;",
         "EXEC MDM.usp_Popular_Bridge_Geo_Campana_Condicion_Cosecha;",
@@ -382,8 +409,12 @@ def _sincronizar_bridges_geografia(engine) -> None:
             try:
                 conexion.execute(text(sp))
             except Exception as e:
-                # If a specific SP fails, log it and continue so the rest can run
-                _imprimir(f'  [ADVERTENCIA] Fallo al ejecutar {sp}: {e}')
+                # Un SP fallido no impide ejecutar el resto, pero queda registrado.
+                nombre_sp = sp.replace('EXEC ', '').rstrip(';').strip()
+                descripcion = str(e) or type(e).__name__
+                _imprimir(f'  [ADVERTENCIA] Fallo al ejecutar {nombre_sp}: {descripcion}')
+                fallas.append(f'{nombre_sp}: {descripcion}')
+    return fallas
 
 
 def _obtener_contexto_sql(engine) -> dict:
@@ -706,13 +737,18 @@ def ejecutar_reproceso_facts(
 
     if plan['marts']:
         paso_actual += 1
-        if _gold_debe_bloquearse(facts_con_error, config_operativa['facts_bloqueantes_gold']):
+        omitidos = _marts_omitidos(facts_con_error, config_operativa['facts_bloqueantes_gold'])
+        marts_a_refrescar = [mart for mart in plan['marts'] if mart not in omitidos]
+        marts_omitidos = [mart for mart in plan['marts'] if mart in omitidos]
+        if marts_omitidos:
+            resumen['Gold marts omitidos'] = ', '.join(marts_omitidos)
+        if not marts_a_refrescar:
             _paso(paso_actual, total, 'Omitiendo Marts Gold por errores previos...')
             resumen['Gold estado'] = 'OMITIDO_POR_ERROR_EN_FACTS'
         else:
             _paso(paso_actual, total, 'Refrescando Marts Gold impactados...')
             try:
-                resumen_marts = refrescar_marts_seleccionados(engine, plan['marts'], resumen_etl=resumen, facts_bloqueantes=frozenset(config_operativa['facts_bloqueantes_gold']))
+                resumen_marts = refrescar_marts_seleccionados(engine, marts_a_refrescar)
                 for mart, valor in resumen_marts.items():
                     resumen[mart] = valor if isinstance(valor, int) else valor
             except Exception as error:
@@ -733,12 +769,18 @@ def ejecutar_reproceso_facts(
 def ejecutar() -> None:
     inicio = _encabezado()
     engine = obtener_engine()
-    total = 23
+    total = TOTAL_PASOS_COMPLETO
+    paso_actual = 0
     resumen = {}
     errores_pipeline: list[str] = []
     facts_con_error: list[str] = []
 
-    _paso(1, total, 'Verificando conexion SQL Server...')
+    def avanzar(descripcion: str) -> None:
+        nonlocal paso_actual
+        paso_actual += 1
+        _paso(paso_actual, total, descripcion)
+
+    avanzar('Verificando conexion SQL Server...')
     if not verificar_conexion():
         _imprimir('Sin conexion. Pipeline detenido.')
         sys.exit(1)
@@ -747,7 +789,7 @@ def ejecutar() -> None:
     resumen['Servidor SQL'] = contexto_sql.get('servidor')
     resumen['Base SQL'] = contexto_sql.get('base_datos')
 
-    _paso(2, total, 'Verificando esquema de objetos criticos en DB...')
+    avanzar('Verificando esquema de objetos criticos en DB...')
     try:
         from utils.verificacion_esquema import verificar_objetos_criticos
         verificar_objetos_criticos(engine)
@@ -755,12 +797,12 @@ def ejecutar() -> None:
         _imprimir(str(_e_esquema))
         raise ErrorEjecucionPipeline([f'Verificacion de esquema fallida: {_e_esquema}'])
 
-    _paso(3, total, 'Limpiando cache...')
+    avanzar('Limpiando cache...')
     limpiar_lookup()
     limpiar_params()
     config_operativa = _cargar_configuracion_operativa()
 
-    _paso(4, total, 'Cargando archivos Excel a Bronce...')
+    avanzar('Cargando archivos Excel a Bronce...')
     resultados_bronce = ejecutar_carga_bronce()
     resumen['Bronce archivos'] = len(resultados_bronce)
     resumen['Bronce filas'] = sum(r['filas'] for r in resultados_bronce)
@@ -780,18 +822,18 @@ def ejecutar() -> None:
             f'Bronce critico: {error_critico_bronce.get("mensaje", "")}'
         ])
 
-    _paso(5, total, 'Cargando Dim_Personal (SCD1)...')
+    avanzar('Cargando Dim_Personal (SCD1)...')
     r = cargar_dim_personal(engine)
     resumen['Dim_Personal insertados'] = r['insertados']
     resumen['Dim_Personal actualizados'] = r['actualizados']
 
-    _paso(6, total, 'Sincronizando Dim_Geografia (arquitectura catálogos)...')
+    avanzar('Sincronizando Dim_Geografia (arquitectura catálogos)...')
     r = cargar_dim_geografia_v2(engine)
     resumen['Dim_Geografia insertados'] = r.get('insertados', 0)
     resumen['Dim_Geografia cerrados'] = r.get('cerrados', 0)
     resumen['Dim_Geografia sin_cambios'] = r.get('sin_cambios', 0)
 
-    _paso(7, total, 'Sincronizando catalogo/bridge de cama via SP...')
+    avanzar('Sincronizando catalogo/bridge de cama via SP...')
     try:
         if tablas_bronce_ok & set(config_operativa['tablas_bronce_sp_cama']):
             bridge_antes = _contar_bridge_geografia_cama(engine)
@@ -827,7 +869,7 @@ def ejecutar() -> None:
         resumen['SP_Cama_Upsert ERROR'] = str(error)
         raise ErrorEjecucionPipeline([f'SP_Cama_Upsert: {error}']) from error
 
-    _paso(8, total, 'Validando calidad de cama via SP...')
+    avanzar('Validando calidad de cama via SP...')
     try:
         r = _ejecutar_sp_validar_camas(
             engine,
@@ -859,16 +901,16 @@ def ejecutar() -> None:
     # 2. Ejecutar Fact_Ciclo_Poda secuencialmente primero
     if poda_meta:
         nombre = 'Fact_Ciclo_Poda'
-        numero = int(poda_meta['orden'])
         tabla_destino = poda_meta['tabla_destino']
         funcion = poda_meta['funcion']
-        _paso(numero, total, f'Cargando {nombre} (Secuencial)...')
+        avanzar(f'Cargando {nombre} (Secuencial)...')
         error_fact = _ejecutar_fact(nombre, tabla_destino, funcion, engine, resumen)
         if error_fact:
             errores_pipeline.append(error_fact)
             facts_con_error.append(nombre)
+            avanzar('Sincronizando bridge de campanas via SP... (omitido: fallo Fact_Ciclo_Poda)')
         else:
-            _paso(10, total, 'Sincronizando bridge de campanas via SP...')
+            avanzar('Sincronizando bridge de campanas via SP...')
             try:
                 _ejecutar_sp_sincronizar_campanas(engine)
                 resumen['SP_Campanas_Sync'] = 'OK'
@@ -882,7 +924,7 @@ def ejecutar() -> None:
     # 3. Ejecutar los hechos restantes en paralelo
     if resto_facts:
         from concurrent.futures import ThreadPoolExecutor, as_completed
-        _imprimir(f"Cargando {len(resto_facts)} hechos en paralelo (max_workers=4)...")
+        avanzar(f'Cargando {len(resto_facts)} hechos en paralelo (max_workers={MAX_WORKERS_FACTS})...')
 
         _resumen_lock = threading.Lock()
 
@@ -891,7 +933,7 @@ def ejecutar() -> None:
             err = _ejecutar_fact(nombre_f, meta_f['tabla_destino'], meta_f['funcion'], engine, thread_res)
             return nombre_f, err, thread_res
 
-        with ThreadPoolExecutor(max_workers=4) as executor:
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS_FACTS) as executor:
             futuros = {executor.submit(_ejecutar_fact_paralelo, nf, mf): nf for nf, mf in resto_facts.items()}
             for futuro in as_completed(futuros):
                 nf = futuros[futuro]
@@ -910,21 +952,31 @@ def ejecutar() -> None:
                     facts_con_error.append(nf)
 
 
-    if _gold_debe_bloquearse(facts_con_error, config_operativa['facts_bloqueantes_gold']):
-        _paso(22, total, 'Omitiendo Marts Gold por errores previos...')
+    omitidos = _marts_omitidos(facts_con_error, config_operativa['facts_bloqueantes_gold'])
+    todos_omitidos = all(mart in omitidos for mart in FUNCIONES_MARTS)
+
+    if todos_omitidos:
+        avanzar('Sincronizando Bridges de Geografia y Campana... (omitido por errores previos)')
+        avanzar('Omitiendo Marts Gold por errores previos...')
         resumen['Gold estado'] = 'OMITIDO_POR_ERROR_EN_FACTS'
     else:
-        _paso(21, total, 'Sincronizando Bridges de Geografia y Campana...')
+        avanzar('Sincronizando Bridges de Geografia y Campana...')
         try:
-            _sincronizar_bridges_geografia(engine)
-            resumen['Bridges Geografia'] = 'OK'
+            fallas_bridges = _sincronizar_bridges_geografia(engine)
         except Exception as error:
-            _imprimir(f'  ERROR sincronizando Bridges: {error}')
-            resumen['Bridges Geografia ERROR'] = str(error)
+            fallas_bridges = [str(error) or type(error).__name__]
+        if fallas_bridges:
+            _imprimir(f'  ERROR sincronizando Bridges: {len(fallas_bridges)} SP(s) fallaron')
+            resumen['Bridges Geografia ERROR'] = ' | '.join(fallas_bridges)
+            errores_pipeline.append(f'Bridges Geografia: {len(fallas_bridges)} SP(s) fallaron')
+        else:
+            resumen['Bridges Geografia'] = 'OK'
 
-        _paso(22, total, 'Refrescando Marts Gold...')
+        if omitidos:
+            resumen['Gold marts omitidos'] = ', '.join(sorted(omitidos))
+        avanzar('Refrescando Marts Gold...')
         try:
-            resumen_marts = refrescar_todos_los_marts(engine, resumen_etl=resumen, facts_bloqueantes=frozenset(config_operativa['facts_bloqueantes_gold']))
+            resumen_marts = refrescar_todos_los_marts(engine, marts_omitidos=frozenset(omitidos))
             for mart, valor in resumen_marts.items():
                 resumen[mart] = valor if isinstance(valor, int) else valor
         except Exception as error:
@@ -933,7 +985,7 @@ def ejecutar() -> None:
             resumen['Gold ERROR'] = str(error)
             errores_pipeline.append(mensaje_error)
 
-    _paso(23, total, 'Finalizando...')
+    avanzar('Finalizando...')
     if errores_pipeline:
         _registrar_errores_resumen(resumen, errores_pipeline)
     _resumen_final(inicio, resumen)

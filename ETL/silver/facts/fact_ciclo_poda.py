@@ -13,7 +13,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy import text
 
 from utils.contexto_transaccional import ContextoTransaccionalETL
-from utils.fechas import obtener_id_tiempo
+from utils.fechas import obtener_id_tiempo, parsear_fecha
 from utils.texto import titulo
 from mdm.homologador import homologar_columna
 from silver.facts._base_processor import BaseFactProcessor
@@ -44,7 +44,9 @@ class ProcesadorCicloPoda(BaseFactProcessor):
         
         # Extraer fecha real de registro en la app para usarla como tiebreaker de duplicados
         fecha_reg_s = self._vectorized_get_raw_val(df, v_raw_df, 'Fecha_Registro_Raw')
-        df['Fecha_Registro_App'] = fecha_reg_s
+        # Se parsea a datetime: el MERGE compara contra dest.Fecha_Registro_App (DATETIME2)
+        # y un string crudo dependería de conversiones implícitas de SQL Server.
+        df['Fecha_Registro_App'] = fecha_reg_s.map(parsear_fecha)
         
         nulos_mask = df['Punto_Temp'].isna()
         if nulos_mask.any():

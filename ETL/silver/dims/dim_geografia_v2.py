@@ -18,9 +18,82 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from utils.texto import limpiar_numerico_texto, titulo, normalizar_espacio
-from silver.dims.dim_geografia import _normalizar_texto, _normalizar_codigo, _normalizar_entero, _parsear_modulo_operativo, _columna_existe, _tabla_existe
 
 _log = logging.getLogger("ETL_Pipeline")
+
+# ── Helpers de normalización (antes importados de dim_geografia.py, ya eliminado) ──
+
+def _tabla_existe(engine: Engine, esquema: str, tabla: str) -> bool:
+    with engine.connect() as conexion:
+        valor = conexion.execute(
+            text(
+                """
+                SELECT CASE WHEN OBJECT_ID(:objeto, 'U') IS NULL THEN 0 ELSE 1 END
+                """
+            ),
+            {"objeto": f"{esquema}.{tabla}"},
+        ).scalar_one()
+    return bool(valor)
+
+
+def _columna_existe(engine: Engine, esquema: str, tabla: str, columna: str) -> bool:
+    with engine.connect() as conexion:
+        valor = conexion.execute(
+            text(
+                """
+                SELECT CASE
+                    WHEN COL_LENGTH(:objeto, :columna) IS NULL THEN 0
+                    ELSE 1
+                END
+                """
+            ),
+            {"objeto": f"{esquema}.{tabla}", "columna": columna},
+        ).scalar_one()
+    return bool(valor)
+
+
+def _es_nulo(valor: Any) -> bool:
+    if valor is None:
+        return True
+    if isinstance(valor, float) and pd.isna(valor):
+        return True
+    return str(valor).strip() in ("", "None", "nan")
+
+
+def _normalizar_texto(valor: Any, usar_titulo: bool = False) -> str | None:
+    if _es_nulo(valor):
+        return None
+    texto = normalizar_espacio(str(valor))
+    if texto is None:
+        return None
+    return titulo(texto) if usar_titulo else texto
+
+
+def _normalizar_codigo(valor: Any) -> str | None:
+    if _es_nulo(valor):
+        return None
+    return limpiar_numerico_texto(_normalizar_texto(valor))
+
+
+def _normalizar_entero(valor: Any) -> int | None:
+    if _es_nulo(valor):
+        return None
+    texto = str(valor).strip()
+    if texto.lower() in ("true", "verdadero", "si", "yes"):
+        return 1
+    if texto.lower() in ("false", "falso", "no"):
+        return 0
+    return int(float(texto))
+
+
+def _parsear_modulo_operativo(modulo_raw: Any) -> int | None:
+    token = _normalizar_texto(modulo_raw)
+    if token is None:
+        return None
+    if re.fullmatch(r"[+-]?\d+", token):
+        return int(token)
+    return None
+
 
 class GestorCatalogos:
     def __init__(self, engine: Engine):
