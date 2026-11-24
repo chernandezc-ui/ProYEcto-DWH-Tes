@@ -47,10 +47,8 @@ _log = logging.getLogger("ETL_Pipeline")
 
 
 class BaseFactProcessor:
-    # Niveles de calidad del circuit breaker (porcentaje de rechazo real sobre leídos)
-    LIMITE_WARNING = circuit_breaker.UMBRAL_WARNING_DEFAULT
-    LIMITE_ERROR = circuit_breaker.UMBRAL_ERROR_DEFAULT
-    LIMITE_CRITICO = circuit_breaker.UMBRAL_CRITICO_DEFAULT
+    # Los umbrales del circuit breaker se leen de Config.Parametros_Pipeline
+    # (BREAKER_*, con override opcional por fact): ver utils/circuit_breaker.py.
 
     def __init__(self, engine: Engine, tabla_origen: str, tabla_destino: str, columna_id: str = None):
         self.engine = engine
@@ -1033,8 +1031,8 @@ class BaseFactProcessor:
             'cama': cama_series
         }, index=df_valid.index)
 
-        from mdm.lookup import _geo_token, _geo_nombre_token, FUNDO_DEFECTO
-        df_geo_keys['f_tok'] = df_geo_keys['fundo'].map(lambda x: _geo_nombre_token(x) or FUNDO_DEFECTO)
+        from mdm.lookup import _geo_token, _geo_nombre_token, fundo_defecto
+        df_geo_keys['f_tok'] = df_geo_keys['fundo'].map(lambda x: _geo_nombre_token(x) or fundo_defecto())
         df_geo_keys['s_tok'] = df_geo_keys['sector'].map(_geo_nombre_token)
         df_geo_keys['m_tok'] = df_geo_keys['modulo'].map(_geo_token)
         df_geo_keys['t_tok'] = df_geo_keys['turno'].map(_geo_token)
@@ -1110,11 +1108,11 @@ class BaseFactProcessor:
         unique_ids_rechazados = len(set(r['id'] for r in rechazos_reales))
         
         total_leidos = self.resumen.get('leidos', 0)
+        # Umbrales vigentes de esta fact (Config.Parametros_Pipeline, BREAKER_*).
+        umbrales = circuit_breaker.resolver_umbrales(self.tabla_destino.split('.')[-1])
         breaker = circuit_breaker.evaluar(
             total_leidos, unique_ids_rechazados,
-            umbrales=circuit_breaker.UmbralesCircuitBreaker(
-                warning=self.LIMITE_WARNING, error=self.LIMITE_ERROR, critico=self.LIMITE_CRITICO,
-            ),
+            umbrales=umbrales,
             tabla=self.tabla_destino,
         )
         porcentaje_rechazo = breaker.porcentaje_rechazo
@@ -1133,7 +1131,7 @@ class BaseFactProcessor:
         # tiene insertados == 0 sin que haya pérdida: no debe disparar la alerta.
         actualizados_total = self.resumen.get('actualizados_por_tiebreaker', 0)
         posible_perdida_silenciosa = (
-            total_leidos >= 50
+            total_leidos >= umbrales.min_muestra
             and insertados_total == 0
             and actualizados_total == 0
             and unique_ids_rechazados == 0

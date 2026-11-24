@@ -234,3 +234,16 @@ def derivar_fecha_iso_semana(anio, semana) -> str | None:
         return datetime.datetime.strptime(f'{year}-W{week:02d}-1', '%G-W%V-%u').strftime('%Y-%m-%d')
     except (ValueError, TypeError):
         return None
+
+
+def columnas_por_estado_fenologico() -> dict[str, list[str]]:
+    """
+    Para Conteo y Peladas: estado fenologico -> columnas (en orden de prioridad)
+    de donde sale su cantidad. Config.Parametros_Pipeline:
+    ESTADOS_FENOLOGICOS_CONTEO (lista) y COLUMNAS_ESTADO_FENOLOGICO.<estado>.
+    """
+    from config import reglas
+    return {
+        estado: reglas.lista(f'COLUMNAS_ESTADO_FENOLOGICO.{estado}')
+        for estado in reglas.lista('ESTADOS_FENOLOGICOS_CONTEO')
+    }

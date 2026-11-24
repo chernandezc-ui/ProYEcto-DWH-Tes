@@ -38,8 +38,6 @@ class ProcesadorAreasPlantas(BaseFactProcessor):
     def __init__(self, engine: Engine):
         super().__init__(engine, TABLA_ORIGEN, TABLA_DESTINO, columna_id='ID_Base_Plantas_Area')
         self.columnas_clave_unica = ['ID_Geografia', 'ID_Variedad', 'ID_Tiempo']
-        self.LIMITE_CRITICO = 101.0
-        self.LIMITE_ERROR = 101.0
 
     def _construir_payload(self, df: pd.DataFrame) -> list[dict]:
         import datetime as _dt

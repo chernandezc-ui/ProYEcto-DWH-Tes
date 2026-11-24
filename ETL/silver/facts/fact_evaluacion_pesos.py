@@ -83,8 +83,6 @@ class ProcesadorEvaluacionPesos(BaseFactProcessor):
         super().__init__(engine, TABLA_ORIGEN, TABLA_DESTINO)
         # Grain: Geo + Tiempo + Variedad + Personal + Peso
         self.columnas_clave_unica = ['ID_Geografia', 'ID_Tiempo', 'ID_Variedad', 'ID_Personal']
-        self.LIMITE_ERROR = 101.0
-        self.LIMITE_CRITICO = 101.0
 
     def _construir_payload(self, df: pd.DataFrame) -> list[dict]:
         # 1. Derivar Fecha_Evento de forma vectorizada

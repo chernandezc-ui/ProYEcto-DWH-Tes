@@ -15,6 +15,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy import text
 
 from utils.dni   import procesar_dni
+from config import reglas
 from utils.texto import normalizar_nombre_persona
 
 
@@ -55,9 +56,9 @@ def _cargar_personal_bronce(engine: Engine) -> pd.DataFrame:
         if not valor:
             return None
         v = str(valor).strip().upper()
-        if v in ('M', 'MASCULINO', 'HOMBRE'):
+        if v in reglas.conjunto('SEXO_MASCULINO'):
             return 'M'
-        if v in ('F', 'FEMENINO', 'MUJER'):
+        if v in reglas.conjunto('SEXO_FEMENINO'):
             return 'F'
         return None
 
@@ -99,7 +100,7 @@ def cargar_dim_personal(engine: Engine) -> dict:
 
     datos = []
     for f in df_bronce.to_dict('records'):
-        nombre = _limpiar(f.get('nombre_limpio')) or 'Sin Nombre'
+        nombre = _limpiar(f.get('nombre_limpio')) or reglas.parametro('NOMBRE_PERSONAL_DEFECTO')
         datos.append({
             'dni':     str(f['dni_limpio']),
             'nombre':  nombre,

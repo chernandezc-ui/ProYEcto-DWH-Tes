@@ -23,6 +23,7 @@ from bronce.rutas import (
     CARPETA_RECHAZADOS,
     listar_carpetas_con_archivos,
 )
+from config import reglas
 from config.conexion import obtener_engine
 from auditoria.log import registrar_inicio, registrar_fin
 
@@ -1306,13 +1307,13 @@ def _proyectar_dataframe_censo_plantas_bronce(ruta_archivo: Path) -> pd.DataFram
 def _proyectar_dataframe_telemetria_clima_bronce(ruta_archivo: Path) -> pd.DataFrame:
     """
     Proyecta el layout de Telemetria de Clima a columnas de Bronce.
-    Extrae el sector climatico desde el nombre del archivo, o usa 'SIN_SECTOR' por defecto.
+    Extrae el sector climatico desde el nombre del archivo, o usa el parametro SECTOR_CLIMATICO_DEFECTO.
     """
     df = _leer_excel_especial(ruta_archivo, sheet_name=0, header_idx=0)
     if df.empty:
         return df
 
-    sector = _extraer_sector_climatico_desde_archivo(ruta_archivo) or 'SIN_SECTOR'
+    sector = _extraer_sector_climatico_desde_archivo(ruta_archivo) or reglas.parametro('SECTOR_CLIMATICO_DEFECTO')
 
     columnas_salida = {
         'Semana_Raw':              _serie_o_nulos(df, 'Semana_Raw'),

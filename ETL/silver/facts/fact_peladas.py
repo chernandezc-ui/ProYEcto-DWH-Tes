@@ -18,6 +18,7 @@ from utils.fechas import obtener_id_tiempo
 from dq.validador import validar_muestras
 from mdm.homologador import homologar_columna
 from silver.facts._base_processor import BaseFactProcessor
+from silver.facts._helpers_fact_comunes import columnas_por_estado_fenologico
 from silver.facts._helpers_fact_comunes import (
     finalizar_resumen_fact as _finalizar_resumen_fact,
     parsear_valores_raw as _parsear_valores_raw,
@@ -50,18 +51,7 @@ class ProcesadorPeladas(BaseFactProcessor):
     def _construir_payload(self, df: pd.DataFrame) -> list[dict]:
         from mdm.lookup import obtener_id_estado_fenologico
 
-        mapeo_dual = {
-            'Boton Floral': ['BotonesFlorales_Raw', 'Botones_Florales_Raw'],
-            'Flor': ['Flores_Raw', 'Flores_Raw'],
-            'Pequena': ['BayasPequenas_Raw', 'Bayas_Pequenas_Raw'],
-            'Verde': ['BayasGrandes_Raw', 'Bayas_Grandes_Verdes_Raw', 'BayasGrandes_Raw'],
-            'Inicio F1': ['Fase1_Raw', 'Fase1_Raw'],
-            'Inicio F2': ['Fase2_Raw', 'Fase2_Raw'],
-            'Crema': ['BayasCremas_Raw', 'Bayas_Cremas_Raw'],
-            'Madura': ['BayasMaduras_Raw', 'Bayas_Maduras_Raw'],
-            'Cosechable': ['BayasCosechables_Raw', 'Bayas_Cosechables_Raw'],
-            'Yema Hinchada': ['YemasActivadas_Raw', 'Yemas_Activadas_Raw', 'YemasHinchadas_Raw', 'Yemas_Hinchadas_Raw', 'Yema_Hinchada_Raw'],
-        }
+        mapeo_dual = columnas_por_estado_fenologico()
 
         # 1. Parsear Valores_Raw en lote
         v_raw_df = pd.DataFrame([self.parsear_raw(x) for x in df['Valores_Raw']], index=df.index)

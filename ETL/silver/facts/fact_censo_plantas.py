@@ -21,6 +21,7 @@ import pandas as pd
 from sqlalchemy.engine import Engine
 from sqlalchemy import text
 
+from config import reglas
 from utils.contexto_transaccional import ContextoTransaccionalETL
 from utils.fechas import obtener_id_tiempo
 from dq.validador import validar_total_plantas
@@ -33,17 +34,8 @@ from silver.facts._helpers_fact_comunes import finalizar_resumen_fact as _finali
 TABLA_ORIGEN  = 'Bronce.Censo_Plantas'
 TABLA_DESTINO = 'Silver.Fact_Censo_Plantas'
 
-# Centinela para censos sin variedad declarada (ver fase51_seed_variedad_sin_variedad.sql).
-# Un censo cuenta plantas por estado; la variedad es opcional, no se rechaza por ausencia.
-ID_VARIEDAD_SIN_VARIEDAD = -1
-
-MAPA_ESTADO_PLANTA = {
-    'BUENAS': 1, 'PLANTAS BUENAS': 1, 'PLANTAS_BUENAS': 1, 'PLANTAS_VIVAS': 1, 'VIVAS': 1,
-    'REGULARES': 2, 'PLANTAS REGULARES': 2, 'PLANTAS_REGULARES': 2,
-    'MALAS': 3, 'PLANTAS MALAS': 3, 'PLANTAS_MALAS': 3,
-    'MUERTAS': 4, 'HOYOS': 4, 'PLANTAS_MUERTAS': 4,
-    'TOTAL_PLANTAS': -1 # Ignoramos el total si viene como columna
-}
+# Reglas configurables (Config.Parametros_Pipeline): ID_VARIEDAD_SIN_VARIEDAD,
+# MAPEO_ESTADO_PLANTA y FECHA_SIN_DATO. Ver config/reglas_semilla.json.
 
 
 def _a_int(valor) -> int | None:
@@ -57,8 +49,6 @@ class ProcesadorCensoPlantas(BaseFactProcessor):
     def __init__(self, engine: Engine):
         super().__init__(engine, TABLA_ORIGEN, TABLA_DESTINO, columna_id='ID_Censo_Plantas')
         self.columnas_clave_unica = ['ID_Geografia', 'ID_Tiempo', 'ID_Variedad', 'ID_Estado_Planta', 'Linea_Raw']
-        self.LIMITE_CRITICO = 101.0
-        self.LIMITE_ERROR = 101.0
 
     def _resolver_variedad_base(self, variedad_canonica: Any) -> int | None:
         from mdm.lookup import obtener_id_variedad
@@ -67,6 +57,8 @@ class ProcesadorCensoPlantas(BaseFactProcessor):
     def _construir_payload(self, df: pd.DataFrame) -> list[dict]:
         import re
         import datetime as _dt
+
+        mapa_estado_planta = {k: int(v) for k, v in reglas.mapeo('MAPEO_ESTADO_PLANTA').items()}
 
         # Identificar columna ID original
         col_id_origen = self.columna_id
@@ -85,7 +77,7 @@ class ProcesadorCensoPlantas(BaseFactProcessor):
                     if len(anio_str) == 2:
                         anio_str = f"20{anio_str}"
                     return f"{anio_str}-01-01"
-            return '2015-01-01'
+            return reglas.parametro('FECHA_SIN_DATO')
 
         df['_Deriv_Fecha_Temp'] = [
             _get_fecha_censo(df.loc[idx, 'Fecha_Raw'], df.loc[idx, 'Campana_Raw'] if 'Campana_Raw' in df.columns else None)
@@ -121,10 +113,11 @@ class ProcesadorCensoPlantas(BaseFactProcessor):
         ids_validos = []
         df_resolved['ID_Variedad'] = -1
 
+        id_sin_variedad = reglas.parametro_int('ID_VARIEDAD_SIN_VARIEDAD')
         for idx, r in df_resolved.iterrows():
             var_raw = r.get('Variedad_Raw')
             if is_empty(var_raw):
-                df_resolved.at[idx, 'ID_Variedad'] = ID_VARIEDAD_SIN_VARIEDAD
+                df_resolved.at[idx, 'ID_Variedad'] = id_sin_variedad
                 ids_validos.append(idx)
             else:
                 var_can = r.get('Variedad_Canonica')
@@ -152,7 +145,7 @@ class ProcesadorCensoPlantas(BaseFactProcessor):
             self.ids_procesados.append(id_origen)
 
             estado_raw = str(r.get('Estado_Planta_Raw') or '').strip().upper()
-            id_estado_planta = MAPA_ESTADO_PLANTA.get(estado_raw)
+            id_estado_planta = mapa_estado_planta.get(estado_raw)
             if id_estado_planta == -1:
                 continue
             if not id_estado_planta:

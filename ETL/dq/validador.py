@@ -17,6 +17,7 @@ Reglas que aplica:
 """
 
 import pandas as pd
+from config import reglas
 from utils.dni    import procesar_dni
 from utils.fechas import describir_rango_campana, procesar_fecha, resolver_dominio_fecha
 from utils.texto  import (
@@ -87,14 +88,15 @@ def validar_fecha(valor: str | None,
 def validar_peso_baya(valor: str | None, config: dict | None = None) -> tuple[float | None, dict | None]:
     """
     Valida que el peso de baya esté en rango.
-    Usa parámetros de config (PESO_BAYA_MIN, PESO_BAYA_MAX) o defaults de seguridad.
+    Los límites salen de Config.Parametros_Pipeline (PESO_BAYA_MIN, PESO_BAYA_MAX);
+    no hay valores por defecto en código. `config` se conserva solo por
+    compatibilidad con los llamadores y no se usa.
     """
     if valor is None:
         return None, _error('Peso_Baya_g', valor, 'Peso nulo', 'ALTO')
 
-    # Obtener límites de la base de datos real o usar defaults si no hay config
-    min_val = float(config.get('PESO_BAYA_MIN', 0.5)) if config else 0.5
-    max_val = float(config.get('PESO_BAYA_MAX', 12.0)) if config else 12.0
+    min_val = reglas.parametro_float('PESO_BAYA_MIN')
+    max_val = reglas.parametro_float('PESO_BAYA_MAX')
 
     try:
         peso = float(str(valor).replace(',', '.'))

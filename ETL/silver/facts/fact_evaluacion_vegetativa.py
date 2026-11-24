@@ -11,6 +11,7 @@ Pisos sin datos quedan con medidas en 0 (no NULL).
 import pandas as pd
 from sqlalchemy.engine import Engine
 
+from config import reglas
 from utils.contexto_transaccional import ContextoTransaccionalETL
 from utils.fechas import obtener_id_tiempo
 from utils.tipos import a_entero, a_decimal
@@ -21,9 +22,6 @@ from silver.facts._helpers_fact_comunes import finalizar_resumen_fact as _finali
 
 TABLA_ORIGEN  = 'Bronce.Evaluacion_Vegetativa'
 TABLA_DESTINO = 'Silver.Fact_Evaluacion_Vegetativa'
-
-PISOS = range(1, 6)
-
 
 def _a_decimal_cero(v) -> float:
     d = a_decimal(v)
@@ -38,7 +36,6 @@ def _a_entero_cero(v) -> int:
 class ProcesadorEvaluacionVegetativa(BaseFactProcessor):
     def __init__(self, engine: Engine):
         super().__init__(engine, TABLA_ORIGEN, TABLA_DESTINO, columna_id='ID_Evaluacion_Veg')
-        self.LIMITE_ERROR = 5.0
         self.columnas_clave_unica = [
             'ID_Geografia', 'ID_Tiempo', 'ID_Variedad', 'ID_Campana', 'Piso', 'ID_Origen_Bronce'
         ]
@@ -80,7 +77,7 @@ class ProcesadorEvaluacionVegetativa(BaseFactProcessor):
             muestra_raw = r.get('Muestra_Plantas_Raw') or v_r.get('Muestra_Plantas_Raw')
             muestra     = int(a_entero(muestra_raw)) if a_entero(muestra_raw) is not None else 1
 
-            for piso in PISOS:
+            for piso in range(1, reglas.parametro_int('EVALUACION_VEGETATIVA_PISOS') + 1):
                 payload.append({
                     'ID_Geografia':          r['ID_Geografia'],
                     '_id_modulo_catalogo':   r['_id_modulo_catalogo'],

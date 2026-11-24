@@ -14,13 +14,14 @@ from sqlalchemy.engine import Engine
 from sqlalchemy import text
 import logging
 import re
+from config import reglas
 from utils.texto import normalizar_espacio, normalizar_componente_geografico
 
 _log = logging.getLogger("ETL_Pipeline")
 
-# Fundo por defecto cuando una fila no trae fundo explícito.
-# Single source of truth — aplica a todo fact/dim que pase por resolver_geografia.
-FUNDO_DEFECTO = 'ARANDANO ACP'
+def fundo_defecto() -> str:
+    """Fundo que se asume cuando una fila no trae fundo: Config.Parametros_Pipeline (FUNDO_DEFECTO)."""
+    return reglas.parametro('FUNDO_DEFECTO')
 
 
 _cache: dict[str, pd.DataFrame] = {}
@@ -34,28 +35,6 @@ _cache_config: dict[str, Any] = {} # Nuevo cache para parámetros y reglas
 # payload de cualquier Fact. RLock permite re-entrada del MISMO thread sin
 # romper la atomicidad frente a otros threads (mantiene la garantia).
 _cache_lock = threading.RLock()
-
-_ALIASES_CINTA = {
-    'amarillo': 'amarilla',
-    'blanco': 'blanca',
-    'rojo': 'roja',
-}
-
-# Aliases para Dim_Estado_Fenologico: mapea variantes de texto de campo
-# Categoria → Nombre_Estado canónico (case-insensitive, ya normalizado).
-_ALIASES_ESTADO_FENOLOGICO = {
-    'ffase1':          'inicio f1',
-    'ffase2':          'inicio f2',
-    'inicio fase 1':   'inicio f1',
-    'inicio fase 2':   'inicio f2',
-    'cosecha':         'cosechable',
-    'floracion':       'flor',
-    'floración':       'flor',
-    'pequena':         'pequena',
-    'pequeña':         'pequena',
-    'punta verde':     'verde',
-    'yema':            'yema hinchada',
-}
 
 
 def obtener_parametros_pipeline(engine: Engine) -> dict[str, Any]:
@@ -140,7 +119,7 @@ def _geo_nombre_token(valor) -> str | None:
 
 def _normalizar_componente(valor) -> str:
     t = normalizar_componente_geografico(valor)
-    if t is None or t.upper() in ('NONE', 'NAN', 'NULL', 'SIN_FUNDO', 'SIN_SECTOR', 'SIN_MODULO', 'SIN_TURNO', 'SIN_VALVULA', 'SIN_CAMA'):
+    if t is None or t.upper() in reglas.conjunto('PLACEHOLDERS_GEOGRAFICOS'):
         return 'NONE'
     return t.lower()
 
@@ -362,7 +341,7 @@ def obtener_id_cinta(color: str | None,
     if clave in mapa:
         return mapa[clave]
 
-    clave_alias = _ALIASES_CINTA.get(clave)
+    clave_alias = reglas.mapeo('ALIAS_CINTA').get(clave)
     if clave_alias is not None:
         return mapa.get(clave_alias)
 
@@ -388,7 +367,7 @@ def obtener_id_estado_fenologico(categoria: str | None,
     if clave in mapa:
         return mapa[clave]
     # Alias configurado
-    clave_alias = _ALIASES_ESTADO_FENOLOGICO.get(clave)
+    clave_alias = reglas.mapeo('ALIAS_ESTADO_FENOLOGICO').get(clave)
     if clave_alias is not None:
         return mapa.get(clave_alias)
     return None
@@ -775,7 +754,7 @@ def resolver_geografia(fundo: str | None,
     Resolver principal de geografia usando CATALOGOS INDEPENDIENTES.
     Bloqueado globalmente para evitar duplicados en auto-create simultaneo.
     """
-    fundo_token = _geo_nombre_token(fundo) or FUNDO_DEFECTO
+    fundo_token = _geo_nombre_token(fundo) or fundo_defecto()
     sector_token = _geo_nombre_token(sector)
     modulo_token = _geo_token(modulo)
     turno_token = _geo_token(turno)

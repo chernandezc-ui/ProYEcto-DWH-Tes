@@ -100,8 +100,6 @@ class ProcesadorTelemetriaClima(BaseFactProcessor):
     def __init__(self, engine: Engine):
         super().__init__(engine, TABLA_CLIMA, TABLA_DESTINO, columna_id='ID_Telemetria_Clima')
         self.columnas_clave_unica = ['Sector_Climatico', 'Fecha_Hora']
-        self.LIMITE_ERROR = 101.0
-        self.LIMITE_CRITICO = 101.0
 
     def _construir_payload(self, df: pd.DataFrame) -> list[dict]:
         # 1. Resolver tiempo de forma vectorizada

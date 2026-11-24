@@ -91,3 +91,8 @@ def verificar_objetos_criticos(engine: Engine) -> None:
             "Objetos críticos con problemas en DB — corrija antes de ejecutar el pipeline:\n"
             + "\n".join(errores)
         )
+
+    # Reglas de negocio configurables (Config.Parametros_Pipeline): si falta alguna
+    # requerida se aborta aquí con la lista completa, en vez de fallar a mitad de carga.
+    from config import reglas
+    reglas.verificar_completitud(engine)

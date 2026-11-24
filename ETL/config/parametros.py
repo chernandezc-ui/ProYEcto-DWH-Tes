@@ -126,6 +126,11 @@ def obtener_lista(parametro: str, default: list[str] | tuple[str, ...] | None = 
     if valor is None or str(valor).strip() == '':
         return [str(item).strip() for item in (default or []) if str(item).strip()]
 
+    return parsear_lista(valor)
+
+
+def parsear_lista(valor) -> list[str]:
+    """Interpreta un valor de parametro como lista (JSON array o separadores comunes)."""
     texto = str(valor).strip()
     if texto.startswith('[') and texto.endswith(']'):
         try:
@@ -145,18 +150,6 @@ def limpiar_cache() -> None:
     """
     global _cache_parametros
     _cache_parametros = {}
+    from config import reglas
+    reglas.limpiar_cache()
 
-
-# ── Tokens de detección de filas no operativas en formularios de campo ──────
-# Frágiles ante cambios en el Excel; centralizar aquí facilita el ajuste sin
-# tocar la lógica de cada fact.
-
-# Valores en la columna Fecha_Raw que indican una fila de encabezado/subtotal.
-TOKENS_FECHA_NO_OPERATIVA: frozenset[str] = frozenset({
-    '', 'NONE', 'PERSONAS', 'HORAS',
-})
-
-# Valores en la columna de supervisor/personal que indican fila administrativa.
-TOKENS_SUPERVISOR_NO_OPERATIVO: frozenset[str] = frozenset({
-    'AREA:', 'FECHA:', 'TURNO:', 'DIA:', 'DÍA:', 'NOCHE:', 'TOTAL',
-})

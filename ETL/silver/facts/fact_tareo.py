@@ -11,7 +11,7 @@ import pandas as pd
 from sqlalchemy.engine import Engine
 from sqlalchemy import text
 
-from config.parametros import TOKENS_FECHA_NO_OPERATIVA, TOKENS_SUPERVISOR_NO_OPERATIVO
+from config import reglas
 from utils.contexto_transaccional import ContextoTransaccionalETL
 from mdm.lookup import obtener_id_actividad
 from utils.fechas import obtener_id_tiempo
@@ -26,7 +26,8 @@ TABLA_DESTINO = 'Silver.Fact_Tareo'
 def _es_fila_no_operativa(fila) -> bool:
     fecha_raw = str(fila.get('Fecha_Raw') or '').strip()
     supervisor_raw = str(fila.get('IDPersonalGeneral_Raw') or '').strip().upper()
-    return fecha_raw.upper() in TOKENS_FECHA_NO_OPERATIVA or supervisor_raw in TOKENS_SUPERVISOR_NO_OPERATIVO
+    return (fecha_raw.upper() in reglas.conjunto('TOKENS_FECHA_NO_OPERATIVA')
+            or supervisor_raw in reglas.conjunto('TOKENS_SUPERVISOR_NO_OPERATIVO'))
 
 
 class ProcesadorTareo(BaseFactProcessor):
@@ -42,8 +43,8 @@ class ProcesadorTareo(BaseFactProcessor):
             col_id_origen = 'ID_Registro_Origen'
 
         # 1. Vectorizar descarte de filas no operativas
-        mask_non_op = df['Fecha_Raw'].astype(str).str.strip().str.upper().isin(TOKENS_FECHA_NO_OPERATIVA) | \
-                      df['IDPersonalGeneral_Raw'].astype(str).str.strip().str.upper().isin(TOKENS_SUPERVISOR_NO_OPERATIVO)
+        mask_non_op = df['Fecha_Raw'].astype(str).str.strip().str.upper().isin(list(reglas.conjunto('TOKENS_FECHA_NO_OPERATIVA'))) | \
+                      df['IDPersonalGeneral_Raw'].astype(str).str.strip().str.upper().isin(list(reglas.conjunto('TOKENS_SUPERVISOR_NO_OPERATIVO')))
         
         df_descartado = df[mask_non_op]
         if not df_descartado.empty:

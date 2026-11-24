@@ -23,6 +23,7 @@ import pandas as pd
 from sqlalchemy.engine import Engine
 from sqlalchemy import text
 
+from config import reglas
 from utils.contexto_transaccional import ContextoTransaccionalETL
 from utils.texto import titulo
 from mdm.homologador import homologar_columna
@@ -200,7 +201,7 @@ class ProcesadorCiclosFenologicos(BaseFactProcessor):
                 'Cama':                  _safe_str(v_r.get('Cama_Raw')),
                 'ID_Cinta':              id_cinta,
                 'Organo':                _safe_str(r.get('Organo_Raw')),
-                'Tipo_Evaluacion':       titulo(_safe_str(v_r.get('Evaluacion_Raw'))) or 'HISTORICO',
+                'Tipo_Evaluacion':       titulo(_safe_str(v_r.get('Evaluacion_Raw'))) or reglas.parametro('TIPO_EVALUACION_HISTORICO'),
                 'ID_Estado_Fenologico':  id_estado,
                 'Evaluador':             evaluador_nombre,
                 'Fecha_Evento':          r['Fecha_Evento_dt'],

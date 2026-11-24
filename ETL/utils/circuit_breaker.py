@@ -3,8 +3,15 @@ circuit_breaker.py
 ==================
 Lógica centralizada del circuit breaker de calidad para los Facts.
 
-BaseFactProcessor.finalizar_proceso delega en evaluar() pasando los LIMITE_*
-de cada instancia; las subclases conservan sus umbrales por dominio.
+Los umbrales NO viven en el código: se leen de Config.Parametros_Pipeline
+(ver config/reglas.py):
+
+  BREAKER_WARNING_PCT / BREAKER_ERROR_PCT / BREAKER_CRITICO_PCT / BREAKER_MIN_MUESTRA
+      valor global, requerido.
+  BREAKER_ERROR_PCT.<Fact>  (ej. BREAKER_ERROR_PCT.Fact_Censo_Plantas)
+      override opcional por fact; gana sobre el global.
+
+BaseFactProcessor.finalizar_proceso delega en evaluar().
 La evaluación es pura. El orquestador incremental lanza después del commit;
 la reconstrucción atómica decide el rollback antes del commit externo.
 """
@@ -13,25 +20,26 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from config import reglas
 from utils.errores import ErrorCircuitBreakerCritico, ErrorCircuitBreakerError
 
-
-# ── Defaults globales (idénticos a los antiguos en BaseFactProcessor) ────
-UMBRAL_WARNING_DEFAULT  = 1.0
-UMBRAL_ERROR_DEFAULT    = 2.0
-UMBRAL_CRITICO_DEFAULT  = 5.0
-MIN_MUESTRA_BREAKER     = 50
-
 NivelBloqueo = Literal['CRITICO', 'ERROR', 'WARNING', None]
+
+PARAMETROS_BREAKER = {
+    'warning': 'BREAKER_WARNING_PCT',
+    'error': 'BREAKER_ERROR_PCT',
+    'critico': 'BREAKER_CRITICO_PCT',
+    'min_muestra': 'BREAKER_MIN_MUESTRA',
+}
 
 
 @dataclass(frozen=True)
 class UmbralesCircuitBreaker:
-    """Configuración inmutable de un circuit breaker."""
-    warning: float = UMBRAL_WARNING_DEFAULT
-    error: float = UMBRAL_ERROR_DEFAULT
-    critico: float = UMBRAL_CRITICO_DEFAULT
-    min_muestra: int = MIN_MUESTRA_BREAKER
+    """Configuración inmutable de un circuit breaker (todos los campos obligatorios)."""
+    warning: float
+    error: float
+    critico: float
+    min_muestra: int
 
     def __post_init__(self):
         # Validación de coherencia: warning <= error <= critico
@@ -55,11 +63,34 @@ class ResultadoCircuitBreaker:
     mensaje: str | None = None
 
 
+def resolver_umbrales(nombre_fact: str | None = None) -> UmbralesCircuitBreaker:
+    """
+    Umbrales vigentes para una fact, leídos de Config.Parametros_Pipeline.
+
+    El valor global de cada parámetro es requerido (ErrorConfiguracion si falta);
+    el parámetro '<NOMBRE>.<Fact>' es opcional y, si existe, gana.
+    """
+    valores = {}
+    for campo, clave in PARAMETROS_BREAKER.items():
+        convertir_int = campo == 'min_muestra'
+        valor = reglas.parametro_int(clave) if convertir_int else reglas.parametro_float(clave)
+        if nombre_fact:
+            especifico = f'{clave}.{nombre_fact}'
+            if reglas.parametro_opcional(especifico) is not None:
+                valor = reglas.parametro_int(especifico) if convertir_int else reglas.parametro_float(especifico)
+        valores[campo] = valor
+    try:
+        return UmbralesCircuitBreaker(**valores)
+    except ValueError as error:
+        destino = f' para {nombre_fact}' if nombre_fact else ''
+        raise reglas.ErrorConfiguracion(f'Umbrales del breaker invalidos{destino}: {error}') from error
+
+
 def evaluar(
     total_leidos: int,
     rechazados: int,
     *,
-    umbrales: UmbralesCircuitBreaker | None = None,
+    umbrales: UmbralesCircuitBreaker,
     tabla: str = '(sin nombre)',
 ) -> ResultadoCircuitBreaker:
     """
@@ -68,7 +99,6 @@ def evaluar(
 
     Si la muestra es menor a `min_muestra`, no aplica el breaker (devuelve nivel=None).
     """
-    umbrales = umbrales or UmbralesCircuitBreaker()
     porcentaje = (rechazados / total_leidos * 100) if total_leidos > 0 else 0.0
 
     if total_leidos < umbrales.min_muestra:
@@ -125,10 +155,8 @@ def lanzar_si_bloqueado(resultado: ResultadoCircuitBreaker) -> None:
 __all__ = [
     'UmbralesCircuitBreaker',
     'ResultadoCircuitBreaker',
+    'PARAMETROS_BREAKER',
+    'resolver_umbrales',
     'evaluar',
     'lanzar_si_bloqueado',
-    'UMBRAL_WARNING_DEFAULT',
-    'UMBRAL_ERROR_DEFAULT',
-    'UMBRAL_CRITICO_DEFAULT',
-    'MIN_MUESTRA_BREAKER',
 ]

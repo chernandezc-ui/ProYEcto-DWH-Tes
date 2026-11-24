@@ -10,6 +10,7 @@ import pandas as pd
 from sqlalchemy.engine import Engine
 from sqlalchemy import text
 
+from config import reglas
 from utils.contexto_transaccional import ContextoTransaccionalETL
 from utils.fechas import obtener_id_tiempo
 from mdm.homologador import homologar_columna
@@ -23,16 +24,9 @@ from silver.facts._helpers_fact_comunes import (
 TABLA_ORIGEN  = 'Bronce.Fisiologia'
 TABLA_DESTINO = 'Silver.Fact_Fisiologia'
 
-MAPA_TERCIO = {
-    'BAJO': 'BAJO', 'B': 'BAJO', 'LOW': 'BAJO',
-    'MEDIO': 'MEDIO', 'M': 'MEDIO', 'MID': 'MEDIO',
-    'ALTO': 'ALTO', 'A': 'ALTO', 'HIGH': 'ALTO',
-}
-
-
 def _normalizar_tercio(valor) -> str | None:
     tercio_raw = str(valor or '').strip().upper()
-    return MAPA_TERCIO.get(tercio_raw, tercio_raw or None)
+    return reglas.mapeo('MAPEO_TERCIO').get(tercio_raw, tercio_raw or None)
 
 
 class ProcesadorFisiologia(BaseFactProcessor):

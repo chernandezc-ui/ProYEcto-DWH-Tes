@@ -1,0 +1,400 @@
+{
+  "_comentario": "Semilla de INSTALACION de las reglas de negocio configurables. El ETL NO lee este archivo al correr: lee Config.Parametros_Pipeline. Se carga con 'py tools/sembrar_reglas.py', que solo agrega los parametros que faltan y nunca modifica uno existente. 'requerido': false = parametro opcional (override por fact). Un valor lista/objeto se guarda como JSON en la columna Valor.",
+  "parametros": [
+    {
+      "nombre": "BREAKER_WARNING_PCT",
+      "valor": "1.0",
+      "descripcion": "Circuit breaker: % de rechazo para WARNING (global)"
+    },
+    {
+      "nombre": "BREAKER_ERROR_PCT",
+      "valor": "2.0",
+      "descripcion": "Circuit breaker: % de rechazo para ERROR (global)"
+    },
+    {
+      "nombre": "BREAKER_CRITICO_PCT",
+      "valor": "5.0",
+      "descripcion": "Circuit breaker: % de rechazo CRITICO, aborta el pipeline (global)"
+    },
+    {
+      "nombre": "BREAKER_MIN_MUESTRA",
+      "valor": "50",
+      "descripcion": "Circuit breaker: filas leidas minimas para que aplique (global)"
+    },
+    {
+      "nombre": "BREAKER_ERROR_PCT.Fact_Areas_Plantas",
+      "valor": "101",
+      "descripcion": "Breaker desactivado para esta fact (>100 % nunca se alcanza)",
+      "requerido": false
+    },
+    {
+      "nombre": "BREAKER_CRITICO_PCT.Fact_Areas_Plantas",
+      "valor": "101",
+      "descripcion": "Breaker desactivado para esta fact",
+      "requerido": false
+    },
+    {
+      "nombre": "BREAKER_ERROR_PCT.Fact_Censo_Plantas",
+      "valor": "101",
+      "descripcion": "Breaker desactivado para esta fact",
+      "requerido": false
+    },
+    {
+      "nombre": "BREAKER_CRITICO_PCT.Fact_Censo_Plantas",
+      "valor": "101",
+      "descripcion": "Breaker desactivado para esta fact",
+      "requerido": false
+    },
+    {
+      "nombre": "BREAKER_ERROR_PCT.Fact_Evaluacion_Pesos",
+      "valor": "101",
+      "descripcion": "Breaker desactivado para esta fact",
+      "requerido": false
+    },
+    {
+      "nombre": "BREAKER_CRITICO_PCT.Fact_Evaluacion_Pesos",
+      "valor": "101",
+      "descripcion": "Breaker desactivado para esta fact",
+      "requerido": false
+    },
+    {
+      "nombre": "BREAKER_ERROR_PCT.Fact_Telemetria_Clima",
+      "valor": "101",
+      "descripcion": "Breaker desactivado para esta fact",
+      "requerido": false
+    },
+    {
+      "nombre": "BREAKER_CRITICO_PCT.Fact_Telemetria_Clima",
+      "valor": "101",
+      "descripcion": "Breaker desactivado para esta fact",
+      "requerido": false
+    },
+    {
+      "nombre": "BREAKER_ERROR_PCT.Fact_Evaluacion_Vegetativa",
+      "valor": "5.0",
+      "descripcion": "Umbral de ERROR propio de esta fact",
+      "requerido": false
+    },
+    {
+      "nombre": "BREAKER_ERROR_PCT.Fact_Induccion_Floral",
+      "valor": "5.0",
+      "descripcion": "Umbral de ERROR propio de esta fact",
+      "requerido": false
+    },
+    {
+      "nombre": "LEVENSHTEIN_UMBRAL",
+      "valor": "0.85",
+      "descripcion": "Homologacion de variedades: puntaje minimo (0-1) para aceptar un match aproximado"
+    },
+    {
+      "nombre": "CAMPANA_FECHA_INICIO",
+      "valor": "2015-01-01",
+      "descripcion": "Inicio de la ventana de fechas validas para los dominios con validacion de campana"
+    },
+    {
+      "nombre": "CAMPANA_FECHA_FIN",
+      "valor": "2030-12-31",
+      "descripcion": "Fin de la ventana de fechas validas para los dominios con validacion de campana"
+    },
+    {
+      "nombre": "PESO_BAYA_MIN",
+      "valor": "0.5",
+      "descripcion": "Peso minimo de baya valido (g)"
+    },
+    {
+      "nombre": "PESO_BAYA_MAX",
+      "valor": "12.0",
+      "descripcion": "Peso maximo de baya valido (g)"
+    },
+    {
+      "nombre": "DNI_LONGITUD",
+      "valor": "8",
+      "descripcion": "Cantidad de digitos de un DNI valido"
+    },
+    {
+      "nombre": "DOMINIOS_SIN_RESTRICCION_CAMPANA",
+      "valor": [
+        "clima",
+        "historico",
+        "induccion_floral",
+        "tasa_crecimiento_brotes",
+        "conteo_fenologico",
+        "evaluacion_vegetativa",
+        "floracion",
+        "censo_plantas",
+        "evaluacion_pesos",
+        "ciclos_fenologicos"
+      ],
+      "descripcion": "Dominios de fecha que NO se validan contra la ventana de campana"
+    },
+    {
+      "nombre": "FUNDO_DEFECTO",
+      "valor": "ARANDANO ACP",
+      "descripcion": "Fundo que se asume cuando una fila no trae fundo"
+    },
+    {
+      "nombre": "TIPO_EVALUACION_SIN_TIPO",
+      "valor": "SIN_TIPO",
+      "descripcion": "Tipo de evaluacion cuando la fuente no lo trae (poda, floracion, induccion)"
+    },
+    {
+      "nombre": "TIPO_EVALUACION_HISTORICO",
+      "valor": "HISTORICO",
+      "descripcion": "Tipo de evaluacion por defecto de Ciclos Fenologicos"
+    },
+    {
+      "nombre": "SECTOR_CLIMATICO_DEFECTO",
+      "valor": "SIN_SECTOR",
+      "descripcion": "Sector climatico cuando no se puede inferir del nombre del archivo"
+    },
+    {
+      "nombre": "NOMBRE_PERSONAL_DEFECTO",
+      "valor": "Sin Nombre",
+      "descripcion": "Nombre cuando el personal no trae nombre"
+    },
+    {
+      "nombre": "ID_VARIEDAD_SIN_VARIEDAD",
+      "valor": -1,
+      "descripcion": "ID_Variedad centinela para censos sin variedad declarada"
+    },
+    {
+      "nombre": "FECHA_SIN_DATO",
+      "valor": "2015-01-01",
+      "descripcion": "Fecha centinela de las facts que no rechazan filas sin fecha (censo, floracion, induccion)"
+    },
+    {
+      "nombre": "EVALUACION_VEGETATIVA_PISOS",
+      "valor": 5,
+      "descripcion": "Cantidad de pisos (1..N) que se expanden en Evaluacion Vegetativa"
+    },
+    {
+      "nombre": "MAPEO_ESTADO_PLANTA",
+      "valor": {
+        "BUENAS": 1,
+        "PLANTAS BUENAS": 1,
+        "PLANTAS_BUENAS": 1,
+        "PLANTAS_VIVAS": 1,
+        "VIVAS": 1,
+        "REGULARES": 2,
+        "PLANTAS REGULARES": 2,
+        "PLANTAS_REGULARES": 2,
+        "MALAS": 3,
+        "PLANTAS MALAS": 3,
+        "PLANTAS_MALAS": 3,
+        "MUERTAS": 4,
+        "HOYOS": 4,
+        "PLANTAS_MUERTAS": 4,
+        "TOTAL_PLANTAS": -1
+      },
+      "descripcion": "Censo: texto del estado de planta -> ID_Estado_Planta (-1 = ignorar la columna total)"
+    },
+    {
+      "nombre": "MAPEO_TERCIO",
+      "valor": {
+        "BAJO": "BAJO",
+        "B": "BAJO",
+        "LOW": "BAJO",
+        "MEDIO": "MEDIO",
+        "M": "MEDIO",
+        "MID": "MEDIO",
+        "ALTO": "ALTO",
+        "A": "ALTO",
+        "HIGH": "ALTO"
+      },
+      "descripcion": "Fisiologia: variantes de texto del tercio -> valor canonico"
+    },
+    {
+      "nombre": "ALIAS_ESTADO_FENOLOGICO",
+      "valor": {
+        "ffase1": "inicio f1",
+        "ffase2": "inicio f2",
+        "inicio fase 1": "inicio f1",
+        "inicio fase 2": "inicio f2",
+        "cosecha": "cosechable",
+        "floracion": "flor",
+        "floración": "flor",
+        "pequena": "pequena",
+        "pequeña": "pequena",
+        "punta verde": "verde",
+        "yema": "yema hinchada"
+      },
+      "descripcion": "Alias de estados fenologicos (texto normalizado) -> Nombre_Estado de Dim_Estado_Fenologico"
+    },
+    {
+      "nombre": "ALIAS_CINTA",
+      "valor": {
+        "amarillo": "amarilla",
+        "blanco": "blanca",
+        "rojo": "roja"
+      },
+      "descripcion": "Alias de color de cinta -> Color_Cinta de Dim_Cinta"
+    },
+    {
+      "nombre": "SEXO_MASCULINO",
+      "valor": [
+        "M",
+        "MASCULINO",
+        "HOMBRE"
+      ],
+      "descripcion": "Valores que se normalizan a sexo M"
+    },
+    {
+      "nombre": "SEXO_FEMENINO",
+      "valor": [
+        "F",
+        "FEMENINO",
+        "MUJER"
+      ],
+      "descripcion": "Valores que se normalizan a sexo F"
+    },
+    {
+      "nombre": "TOKENS_FECHA_NO_OPERATIVA",
+      "valor": [
+        "",
+        "NONE",
+        "PERSONAS",
+        "HORAS"
+      ],
+      "descripcion": "Tareos: valores de Fecha_Raw que marcan una fila de encabezado/subtotal (incluye el vacio)"
+    },
+    {
+      "nombre": "TOKENS_SUPERVISOR_NO_OPERATIVO",
+      "valor": [
+        "AREA:",
+        "FECHA:",
+        "TURNO:",
+        "DIA:",
+        "DÍA:",
+        "NOCHE:",
+        "TOTAL"
+      ],
+      "descripcion": "Tareos: valores de supervisor/personal que marcan una fila administrativa"
+    },
+    {
+      "nombre": "TIPO_EVALUACION_CONTEO_CONTIENE",
+      "valor": [
+        "conteo",
+        "fenolog"
+      ],
+      "descripcion": "Conteo fenologico: tipos de evaluacion validos si el texto normalizado CONTIENE alguno"
+    },
+    {
+      "nombre": "TIPO_EVALUACION_CONTEO_EXACTO",
+      "valor": [
+        "poda general"
+      ],
+      "descripcion": "Conteo fenologico: tipos de evaluacion validos si el texto normalizado es IGUAL a alguno"
+    },
+    {
+      "nombre": "PLACEHOLDERS_GEOGRAFICOS",
+      "valor": [
+        "NONE",
+        "NAN",
+        "NULL",
+        "SIN_FUNDO",
+        "SIN_SECTOR",
+        "SIN_MODULO",
+        "SIN_TURNO",
+        "SIN_VALVULA",
+        "SIN_CAMA"
+      ],
+      "descripcion": "Valores de geografia que significan 'sin dato'"
+    },
+    {
+      "nombre": "ESTADOS_FENOLOGICOS_CONTEO",
+      "valor": [
+        "Boton Floral",
+        "Flor",
+        "Pequena",
+        "Verde",
+        "Inicio F1",
+        "Inicio F2",
+        "Crema",
+        "Madura",
+        "Cosechable",
+        "Yema Hinchada"
+      ],
+      "descripcion": "Conteo/Peladas: estados fenologicos (en orden). Sus columnas estan en COLUMNAS_ESTADO_FENOLOGICO.<estado>"
+    },
+    {
+      "nombre": "COLUMNAS_ESTADO_FENOLOGICO.Boton Floral",
+      "valor": [
+        "BotonesFlorales_Raw",
+        "Botones_Florales_Raw"
+      ],
+      "descripcion": "Columnas (en orden de prioridad) de donde sale la cantidad del estado 'Boton Floral'"
+    },
+    {
+      "nombre": "COLUMNAS_ESTADO_FENOLOGICO.Flor",
+      "valor": [
+        "Flores_Raw"
+      ],
+      "descripcion": "Columnas (en orden de prioridad) de donde sale la cantidad del estado 'Flor'"
+    },
+    {
+      "nombre": "COLUMNAS_ESTADO_FENOLOGICO.Pequena",
+      "valor": [
+        "BayasPequenas_Raw",
+        "Bayas_Pequenas_Raw"
+      ],
+      "descripcion": "Columnas (en orden de prioridad) de donde sale la cantidad del estado 'Pequena'"
+    },
+    {
+      "nombre": "COLUMNAS_ESTADO_FENOLOGICO.Verde",
+      "valor": [
+        "BayasGrandes_Raw",
+        "Bayas_Grandes_Verdes_Raw"
+      ],
+      "descripcion": "Columnas (en orden de prioridad) de donde sale la cantidad del estado 'Verde'"
+    },
+    {
+      "nombre": "COLUMNAS_ESTADO_FENOLOGICO.Inicio F1",
+      "valor": [
+        "Fase1_Raw"
+      ],
+      "descripcion": "Columnas (en orden de prioridad) de donde sale la cantidad del estado 'Inicio F1'"
+    },
+    {
+      "nombre": "COLUMNAS_ESTADO_FENOLOGICO.Inicio F2",
+      "valor": [
+        "Fase2_Raw"
+      ],
+      "descripcion": "Columnas (en orden de prioridad) de donde sale la cantidad del estado 'Inicio F2'"
+    },
+    {
+      "nombre": "COLUMNAS_ESTADO_FENOLOGICO.Crema",
+      "valor": [
+        "BayasCremas_Raw",
+        "Bayas_Cremas_Raw"
+      ],
+      "descripcion": "Columnas (en orden de prioridad) de donde sale la cantidad del estado 'Crema'"
+    },
+    {
+      "nombre": "COLUMNAS_ESTADO_FENOLOGICO.Madura",
+      "valor": [
+        "BayasMaduras_Raw",
+        "Bayas_Maduras_Raw"
+      ],
+      "descripcion": "Columnas (en orden de prioridad) de donde sale la cantidad del estado 'Madura'"
+    },
+    {
+      "nombre": "COLUMNAS_ESTADO_FENOLOGICO.Cosechable",
+      "valor": [
+        "BayasCosechables_Raw",
+        "Bayas_Cosechables_Raw"
+      ],
+      "descripcion": "Columnas (en orden de prioridad) de donde sale la cantidad del estado 'Cosechable'"
+    },
+    {
+      "nombre": "COLUMNAS_ESTADO_FENOLOGICO.Yema Hinchada",
+      "valor": [
+        "YemasActivadas_Raw",
+        "Yemas_Activadas_Raw",
+        "YemasHinchadas_Raw",
+        "Yemas_Hinchadas_Raw",
+        "Yema_Hinchada_Raw"
+      ],
+      "descripcion": "Columnas (en orden de prioridad) de donde sale la cantidad del estado 'Yema Hinchada'"
+    }
+  ]
+}

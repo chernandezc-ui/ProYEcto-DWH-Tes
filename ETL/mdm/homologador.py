@@ -31,6 +31,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy import text
 from datetime import datetime
 
+from config import reglas
 from utils.contexto_transaccional import RecursoDB, administrar_recurso_db
 from utils.texto import (
     compactar_variedad_para_match,
@@ -43,7 +44,10 @@ from utils.texto import (
 import logging
 _log = logging.getLogger("ETL_Pipeline")
 
-UMBRAL_AUTO = 0.85
+
+def _umbral_auto() -> float:
+    """Puntaje minimo (0-1) para aceptar un match aproximado: Config.Parametros_Pipeline."""
+    return reglas.parametro_float('LEVENSHTEIN_UMBRAL')
 
 
 def _clave_variedad(valor: str | None) -> str | None:
@@ -185,7 +189,7 @@ def buscar_match_levenshtein(valor: str,
     match_clave, score, _ = resultado
     score_norm = score / 100.0
 
-    if score_norm < UMBRAL_AUTO:
+    if score_norm < _umbral_auto():
         return None, score_norm
 
     coincidencia = catalogo_match[catalogo_match['Clave_Valor_Canonico'] == match_clave]

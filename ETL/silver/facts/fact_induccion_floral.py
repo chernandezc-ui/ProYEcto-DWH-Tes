@@ -8,6 +8,7 @@ import re
 import pandas as pd
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
+from config import reglas
 from utils.contexto_transaccional import ContextoTransaccionalETL
 from utils.fechas import obtener_id_tiempo
 from mdm.homologador import homologar_columna
@@ -101,7 +102,6 @@ class ProcesadorInduccionFloral(BaseFactProcessor):
         super().__init__(engine, TABLA_ORIGEN, TABLA_DESTINO, columna_id=columna_id)
         # El historico tiene ~3% de geografias no catalogadas (modulos antiguos/renombrados).
         # Subimos el umbral a 5% para evitar falsos positivos del circuit breaker.
-        self.LIMITE_ERROR = 5.0
         # Grain: Geo + Tiempo + Variedad + Personal + Tipo_Evaluacion
         self.columnas_clave_unica = ['ID_Geografia', 'ID_Tiempo', 'ID_Variedad', 'ID_Personal', 'Tipo_Evaluacion']
         self._columna_id = columna_id
@@ -137,7 +137,7 @@ class ProcesadorInduccionFloral(BaseFactProcessor):
                     year_campana = primer_num + 2000 if primer_num < 100 else primer_num
                     return f'{year_campana}-01-01'
                     
-            return '2015-01-01'
+            return reglas.parametro('FECHA_SIN_DATO')
             
         df['_Deriv_Fecha_Temp'] = [
             _derivar_fecha_fila(df.loc[idx, 'Fecha_Raw'], v_raw_df.loc[idx])
@@ -247,7 +247,7 @@ class ProcesadorInduccionFloral(BaseFactProcessor):
                 'ID_Tiempo':                      int(r['ID_Tiempo']),
                 'ID_Variedad':                    int(r['ID_Variedad']),
                 'ID_Personal':                    int(r['ID_Personal']),
-                'Tipo_Evaluacion':                _texto_nulo(r.get('Evaluacion_Raw')) or 'SIN_TIPO',
+                'Tipo_Evaluacion':                _texto_nulo(r.get('Evaluacion_Raw')) or reglas.parametro('TIPO_EVALUACION_SIN_TIPO'),
                 'Cantidad_Plantas_Por_Cama':      plantas_por_cama,
                 'Cantidad_Plantas_Con_Induccion': plantas_con_induccion,
                 'Cantidad_Brotes_Con_Induccion':  brotes_con_induccion,

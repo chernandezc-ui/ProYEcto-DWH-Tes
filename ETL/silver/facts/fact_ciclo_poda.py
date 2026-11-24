@@ -12,6 +12,7 @@ import pandas as pd
 from sqlalchemy.engine import Engine
 from sqlalchemy import text
 
+from config import reglas
 from utils.contexto_transaccional import ContextoTransaccionalETL
 from utils.fechas import obtener_id_tiempo, parsear_fecha
 from utils.texto import titulo
@@ -89,7 +90,7 @@ class ProcesadorCicloPoda(BaseFactProcessor):
                 '_id_modulo_catalogo': r['_id_modulo_catalogo'],
                 'ID_Tiempo':          int(r['ID_Tiempo']),
                 'ID_Variedad':        int(r['ID_Variedad']),
-                'Tipo_Evaluacion':    titulo(r.get('Tipo_Evaluacion_Raw')) or 'SIN_TIPO',
+                'Tipo_Evaluacion':    titulo(r.get('Tipo_Evaluacion_Raw')) or reglas.parametro('TIPO_EVALUACION_SIN_TIPO'),
                 'Punto':              int(r['Punto_Temp']),
                 'Tallos_Planta':      _a_decimal(r.get('TallosPlanta_Raw')),
                 'Longitud_Tallo':     _a_decimal(r.get('LongitudTallo_Raw')),

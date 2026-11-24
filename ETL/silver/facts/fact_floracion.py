@@ -14,6 +14,7 @@ import pandas as pd
 from sqlalchemy.engine import Engine
 from sqlalchemy import text
 
+from config import reglas
 from utils.contexto_transaccional import ContextoTransaccionalETL
 from utils.fechas import obtener_id_tiempo
 from utils.sql_lotes import ejecutar_en_lotes
@@ -160,7 +161,7 @@ class ProcesadorFloracion(BaseFactProcessor):
                             year_campana = primer_num + 2000 if primer_num < 100 else primer_num
                             fecha_str = f'{year_campana}-01-01'
                 if not fecha_str or str(fecha_str).strip() in ('', 'None', 'nan'):
-                    fecha_str = '2015-01-01'
+                    fecha_str = reglas.parametro('FECHA_SIN_DATO')
             return str(fecha_str)
 
         df['_Deriv_Fecha_Temp'] = [
@@ -226,7 +227,7 @@ class ProcesadorFloracion(BaseFactProcessor):
                 'ID_Tiempo':                       int(r['ID_Tiempo']),
                 'ID_Variedad':                     int(r['ID_Variedad']),
                 'ID_Personal':                     int(r['ID_Personal']),
-                'Tipo_Evaluacion':                 _texto_nulo(r.get('Evaluacion_Raw')) or 'SIN_TIPO',
+                'Tipo_Evaluacion':                 _texto_nulo(r.get('Evaluacion_Raw')) or reglas.parametro('TIPO_EVALUACION_SIN_TIPO'),
                 'Cantidad_Plantas_Evaluadas':      plantas_evaluadas,
                 'Cantidad_Plantas_en_Floracion':   plantas_en_floracion,
                 'Fecha_Evento':                    r['Fecha_Evento_dt'],

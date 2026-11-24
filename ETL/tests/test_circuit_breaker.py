@@ -20,6 +20,9 @@ from utils.circuit_breaker import (
 )
 from utils.errores import ErrorCircuitBreakerCritico, ErrorCircuitBreakerError
 
+# Valores de prueba (en produccion salen de Config.Parametros_Pipeline).
+PRODUCCION = UmbralesCircuitBreaker(warning=1.0, error=2.0, critico=5.0, min_muestra=50)
+
 
 def _procesador(total=100, rechazados=10, insertados=90):
     from silver.facts import _base_processor as bp
@@ -36,33 +39,33 @@ def _procesador(total=100, rechazados=10, insertados=90):
 class TestEvaluacionUmbrales(unittest.TestCase):
     def test_muestra_pequena_no_dispara(self):
         # Con < 50 filas el breaker no aplica
-        r = evaluar(total_leidos=20, rechazados=10, tabla='X')
+        r = evaluar(total_leidos=20, rechazados=10, tabla='X', umbrales=PRODUCCION)
         self.assertIsNone(r.nivel)
         self.assertEqual(r.porcentaje_rechazo, 50.0)
 
     def test_nivel_critico(self):
         # 5% sobre 100 filas dispara CRITICO (default 5.0)
-        r = evaluar(total_leidos=100, rechazados=6, tabla='X')
+        r = evaluar(total_leidos=100, rechazados=6, tabla='X', umbrales=PRODUCCION)
         self.assertEqual(r.nivel, 'CRITICO')
 
     def test_nivel_error(self):
         # 3% sobre 100 dispara ERROR (default 2.0) pero NO crítico (5.0)
-        r = evaluar(total_leidos=100, rechazados=3, tabla='X')
+        r = evaluar(total_leidos=100, rechazados=3, tabla='X', umbrales=PRODUCCION)
         self.assertEqual(r.nivel, 'ERROR')
 
     def test_nivel_warning(self):
         # 1.5% sobre 100 dispara WARNING (default 1.0) pero NO error
-        r = evaluar(total_leidos=200, rechazados=3, tabla='X')
+        r = evaluar(total_leidos=200, rechazados=3, tabla='X', umbrales=PRODUCCION)
         self.assertEqual(r.nivel, 'WARNING')
 
     def test_sin_rechazos(self):
-        r = evaluar(total_leidos=1000, rechazados=0, tabla='X')
+        r = evaluar(total_leidos=1000, rechazados=0, tabla='X', umbrales=PRODUCCION)
         self.assertIsNone(r.nivel)
         self.assertEqual(r.porcentaje_rechazo, 0.0)
 
     def test_umbrales_custom(self):
         # FactCensoPlantas usa thresholds más permisivos
-        umbrales = UmbralesCircuitBreaker(warning=50.0, error=95.0, critico=99.0)
+        umbrales = UmbralesCircuitBreaker(warning=50.0, error=95.0, critico=99.0, min_muestra=50)
         r = evaluar(total_leidos=1000, rechazados=600, umbrales=umbrales, tabla='X')
         self.assertEqual(r.nivel, 'WARNING')  # 60% > 50% warning
         r = evaluar(total_leidos=1000, rechazados=960, umbrales=umbrales, tabla='X')
@@ -71,27 +74,27 @@ class TestEvaluacionUmbrales(unittest.TestCase):
     def test_umbrales_invalidos_lanzan(self):
         # warning > error -> incoherente
         with self.assertRaises(ValueError):
-            UmbralesCircuitBreaker(warning=10.0, error=5.0, critico=20.0)
+            UmbralesCircuitBreaker(warning=10.0, error=5.0, critico=20.0, min_muestra=50)
 
 
 class TestLanzarSiBloqueado(unittest.TestCase):
     def test_lanza_critico(self):
-        r = evaluar(total_leidos=100, rechazados=10, tabla='X')
+        r = evaluar(total_leidos=100, rechazados=10, tabla='X', umbrales=PRODUCCION)
         with self.assertRaises(ErrorCircuitBreakerCritico):
             lanzar_si_bloqueado(r)
 
     def test_lanza_error(self):
-        r = evaluar(total_leidos=100, rechazados=3, tabla='X')
+        r = evaluar(total_leidos=100, rechazados=3, tabla='X', umbrales=PRODUCCION)
         with self.assertRaises(ErrorCircuitBreakerError):
             lanzar_si_bloqueado(r)
 
     def test_no_lanza_warning(self):
-        r = evaluar(total_leidos=200, rechazados=3, tabla='X')
+        r = evaluar(total_leidos=200, rechazados=3, tabla='X', umbrales=PRODUCCION)
         self.assertEqual(r.nivel, 'WARNING')
         lanzar_si_bloqueado(r)  # no debe lanzar
 
     def test_no_lanza_sin_nivel(self):
-        r = evaluar(total_leidos=1000, rechazados=0, tabla='X')
+        r = evaluar(total_leidos=1000, rechazados=0, tabla='X', umbrales=PRODUCCION)
         lanzar_si_bloqueado(r)
 
 
@@ -110,7 +113,7 @@ class TestBreakerNoDestructivo(unittest.TestCase):
 
     def test_evaluar_no_lanza_nunca(self):
         # Aun con 100% rechazo, evaluar() solo devuelve resultado.
-        r = evaluar(total_leidos=1000, rechazados=1000, tabla='X')
+        r = evaluar(total_leidos=1000, rechazados=1000, tabla='X', umbrales=PRODUCCION)
         self.assertEqual(r.nivel, 'CRITICO')
         # No debe haber lanzado nada al llegar aqui.
 
@@ -203,7 +206,7 @@ def test_produccion_delega_en_el_evaluador_canonico():
     with patch.object(circuit_breaker, 'evaluar', wraps=circuit_breaker.evaluar) as evaluation:
         payload = processor.finalizar_proceso(MagicMock())
     evaluation.assert_called_once_with(
-        100, 10, umbrales=UmbralesCircuitBreaker(), tabla='Silver.Test',
+        100, 10, umbrales=PRODUCCION, tabla='Silver.Test',
     )
     assert payload['breaker_nivel'] == 'CRITICO'
 

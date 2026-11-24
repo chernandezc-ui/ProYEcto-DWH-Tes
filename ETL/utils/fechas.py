@@ -11,7 +11,7 @@ from typing import Optional
 
 import pandas as pd
 
-from config.parametros import obtener
+from config import reglas
 
 
 _EXCEL_BASE_DATE = datetime(1899, 12, 30)
@@ -36,35 +36,9 @@ FORMATOS_ACEPTADOS = [
     '%d.%m.%Y',
 ]
 
-FECHA_CAMPANA_INICIO = '2025-03-01'
-FECHA_CAMPANA_FIN = '2026-06-30'
-
-DOMINIOS_SIN_RESTRICCION_CAMPANA = {
-    'clima',
-    'historico',
-    'induccion_floral',
-    'tasa_crecimiento_brotes',
-    'conteo_fenologico',
-    'evaluacion_vegetativa',
-    'floracion',
-    'censo_plantas',
-    'evaluacion_pesos',
-    'ciclos_fenologicos',
-}
-
-
 def _obtener_rango_campana_configurado() -> tuple[str, str]:
-    try:
-        inicio = obtener('CAMPANA_FECHA_INICIO', FECHA_CAMPANA_INICIO)
-        fin = obtener('CAMPANA_FECHA_FIN', FECHA_CAMPANA_FIN)
-    except Exception:
-        inicio = FECHA_CAMPANA_INICIO
-        fin = FECHA_CAMPANA_FIN
-
-    return (
-        str(inicio).strip() or FECHA_CAMPANA_INICIO,
-        str(fin).strip() or FECHA_CAMPANA_FIN,
-    )
+    """Ventana de fechas validas: Config.Parametros_Pipeline (CAMPANA_FECHA_INICIO / _FIN)."""
+    return reglas.parametro('CAMPANA_FECHA_INICIO'), reglas.parametro('CAMPANA_FECHA_FIN')
 
 
 def obtener_politica_fecha(dominio: str | None = None) -> dict:
@@ -79,7 +53,7 @@ def obtener_politica_fecha(dominio: str | None = None) -> dict:
         'inicio': inicio,
         'fin': fin,
     }
-    if clave in DOMINIOS_SIN_RESTRICCION_CAMPANA:
+    if clave in reglas.conjunto('DOMINIOS_SIN_RESTRICCION_CAMPANA'):
         return {
             'validar_campana': False,
             'inicio': None,

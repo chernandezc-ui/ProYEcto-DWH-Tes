@@ -14,11 +14,13 @@ import pandas as pd
 from sqlalchemy.engine import Engine
 from sqlalchemy import text
 
+from config import reglas
 from utils.contexto_transaccional import ContextoTransaccionalETL
 from utils.fechas import obtener_id_tiempo, parsear_fecha
 from mdm.lookup import obtener_id_estado_fenologico
 from mdm.homologador import homologar_columna
 from silver.facts._base_processor import BaseFactProcessor
+from silver.facts._helpers_fact_comunes import columnas_por_estado_fenologico
 from silver.facts._helpers_fact_comunes import (
     finalizar_resumen_fact as _finalizar_resumen_fact,
     parsear_valores_raw as _parsear_valores_raw,
@@ -27,18 +29,6 @@ from silver.facts._helpers_fact_comunes import (
 
 TABLA_ORIGEN = 'Bronce.Conteo_Fruta'
 TABLA_DESTINO = 'Silver.Fact_Conteo_Fenologico'
-
-MAPA_ESTADOS_WIDE = {
-    'Botones_Florales_Raw': 'Boton Floral',
-    'Flores_Raw': 'Flor',
-    'Bayas_Pequenas_Raw': 'Pequena',
-    'Bayas_Grandes_Verdes_Raw': 'Verde',
-    'Fase1_Raw': 'Inicio F1',
-    'Fase2_Raw': 'Inicio F2',
-    'Bayas_Cremas_Raw': 'Crema',
-    'Bayas_Maduras_Raw': 'Madura',
-    'Bayas_Cosechables_Raw': 'Cosechable',
-}
 
 SQL_INSERT_FACT = text("""
     INSERT INTO Silver.Fact_Conteo_Fenologico (
@@ -81,11 +71,9 @@ def _es_evaluacion_compatible_con_conteo(valor) -> bool:
     normalizado = _normalizar_tipo_evaluacion(valor)
     if not normalizado:
         return True
-    if 'conteo' in normalizado or 'fenolog' in normalizado:
+    if any(token in normalizado for token in reglas.lista('TIPO_EVALUACION_CONTEO_CONTIENE')):
         return True
-    if normalizado == 'poda general':
-        return True
-    return False
+    return normalizado in reglas.conjunto('TIPO_EVALUACION_CONTEO_EXACTO')
 
 
 def _normalizar_cantidad(valor) -> int:
@@ -115,18 +103,7 @@ def _extraer_estados_desde_fila(fila) -> list[tuple[str, int]]:
     estados: list[tuple[str, int]] = []
     
     # Mapeo unificado para soportar tanto columnas físicas del nuevo layout como las llaves de Valores_Raw antiguas
-    mapeo_dual = {
-        'Boton Floral': ['BotonesFlorales_Raw', 'Botones_Florales_Raw'],
-        'Flor': ['Flores_Raw', 'Flores_Raw'],
-        'Pequena': ['BayasPequenas_Raw', 'Bayas_Pequenas_Raw'],
-        'Verde': ['BayasGrandes_Raw', 'Bayas_Grandes_Verdes_Raw'],
-        'Inicio F1': ['Fase1_Raw', 'Fase1_Raw'],
-        'Inicio F2': ['Fase2_Raw', 'Fase2_Raw'],
-        'Crema': ['BayasCremas_Raw', 'Bayas_Cremas_Raw'],
-        'Madura': ['BayasMaduras_Raw', 'Bayas_Maduras_Raw'],
-        'Cosechable': ['BayasCosechables_Raw', 'Bayas_Cosechables_Raw'],
-        'Yema Hinchada': ['YemasActivadas_Raw', 'Yemas_Activadas_Raw', 'YemasHinchadas_Raw', 'Yemas_Hinchadas_Raw', 'Yema_Hinchada_Raw'],
-    }
+    mapeo_dual = columnas_por_estado_fenologico()
 
     for nombre_estado, claves in mapeo_dual.items():
         cantidad_val = None
