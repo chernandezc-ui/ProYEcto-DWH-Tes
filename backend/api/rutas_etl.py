@@ -254,7 +254,7 @@ async def pasos_corrida(id_corrida: str) -> list[RespuestaPasoCorrida]:
 async def stream_corrida(id_corrida: str) -> EventSourceResponse:
     if not await corrida_existe(id_corrida):
         raise ErrorRecursoNoEncontrado(f"Corrida '{id_corrida}'")
-    return EventSourceResponse(stream_eventos_corrida(id_corrida))
+    return EventSourceResponse(stream_eventos_corrida(id_corrida), ping=20)
 
 
 # ── DELETE /corridas/{id} — Cancelar ─────────────────────────────────────────

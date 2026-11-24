@@ -4,7 +4,7 @@ nucleo/auth.py
 Core de autenticación y autorización del backend ACP Platform.
 
 Responsabilidades:
-  - Hashing y verificación de contraseñas (bcrypt via passlib)
+  - Hashing y verificación de contraseñas (bcrypt directo)
   - Generación y validación de JWT (python-jose HS256)
   - Dependencias FastAPI: obtener_usuario_actual, require_rol
 

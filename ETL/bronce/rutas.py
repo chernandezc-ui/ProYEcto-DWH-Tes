@@ -120,6 +120,22 @@ def _inferir_carpeta_por_archivo(nombre_archivo: str) -> str | None:
     return None
 
 
+def _iterar_excels(carpeta: Path):
+    """
+    Itera archivos Excel (.xlsx/.XLSX) en una carpeta de forma portable
+    entre Windows y Linux (case-insensitive) ignorando archivos temporales (~$...).
+    """
+    if not carpeta.exists():
+        return
+    for archivo in carpeta.iterdir():
+        if (
+            archivo.is_file()
+            and archivo.suffix.lower() == '.xlsx'
+            and not archivo.name.startswith('~$')
+        ):
+            yield archivo
+
+
 def obtener_archivo_mas_reciente(carpeta: Path) -> Path | None:
     """
     Retorna el archivo .xlsx más reciente de una carpeta.
@@ -128,7 +144,7 @@ def obtener_archivo_mas_reciente(carpeta: Path) -> Path | None:
     archivos = sorted(
         (
             archivo
-            for archivo in carpeta.glob('*.xlsx')
+            for archivo in _iterar_excels(carpeta)
             if not _archivo_tiene_marca_vigente(archivo)
         ),
         key=lambda archivo: archivo.stat().st_mtime,
@@ -187,7 +203,7 @@ def listar_carpetas_con_archivos() -> list[tuple[str, Path, str]]:
                 pendientes_por_carpeta[carpeta_canonica] = archivo
 
         # 2) Archivos sueltos en data/entrada.
-        for archivo in CARPETA_ENTRADA.glob('*.xlsx'):
+        for archivo in _iterar_excels(CARPETA_ENTRADA):
             if _archivo_tiene_marca_vigente(archivo):
                 continue
 

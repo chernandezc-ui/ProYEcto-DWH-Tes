@@ -172,6 +172,7 @@ def iniciar_servicio(svc: dict) -> bool:
     proc = subprocess.Popen(
         svc["cmd"],
         cwd=str(svc["cwd"]),
+        stdin=subprocess.DEVNULL,
         stdout=log_file,
         stderr=log_file,
         creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0,

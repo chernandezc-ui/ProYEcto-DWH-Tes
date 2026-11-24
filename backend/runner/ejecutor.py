@@ -14,9 +14,11 @@ Responsabilidades:
 """
 
 from __future__ import annotations
+import json
 import os
 import queue
 import re
+import signal
 import sys
 import subprocess
 import threading
@@ -46,9 +48,15 @@ _RE_METRICAS = re.compile(
     r".*?(\d[\d\s]*)\s+(?:rechazados?|errores?)",
     re.IGNORECASE,
 )
+_PREFIJO_EVENTO_ESTRUCTURADO = "@@ACP_EVENT "
 # Tiempo máximo por paso individual del pipeline.
 # Si un paso activo supera este límite sin producir output, se aborta la corrida.
 _TIMEOUT_PASO_SEGUNDOS = 600
+# Tiempo máximo esperando el primer output tras lanzar pipeline.py.
+# Evita que un subproceso congelado al arrancar retenga el lock durante 1 hora.
+_TIMEOUT_ARRANQUE_SEGUNDOS = 90
+# Intervalo de sondeo de cancelación (más ágil que el heartbeat de 30s).
+_POLL_CANCELACION_SEG = 5
 
 
 @dataclass
@@ -98,11 +106,67 @@ def _linea_es_error_de_paso(linea: str, paso_activo: _PasoActivo | None) -> tupl
     return False, None
 
 
+def _parsear_evento_estructurado(linea: str) -> dict | None:
+    """Parsea líneas estructuradas `@@ACP_EVENT {...}` emitidas por pipeline.py."""
+    if not linea.startswith(_PREFIJO_EVENTO_ESTRUCTURADO):
+        return None
+    crudo = linea[len(_PREFIJO_EVENTO_ESTRUCTURADO):].strip()
+    if not crudo:
+        return None
+    try:
+        datos = json.loads(crudo)
+        return datos if isinstance(datos, dict) else None
+    except json.JSONDecodeError:
+        return None
+
+
+def _terminar_arbol_proceso(proceso: subprocess.Popen) -> None:
+    """
+    Termina el subproceso y todos sus hijos en Windows (taskkill /T /F)
+    y en Linux/POSIX (killpg sobre el grupo de procesos creado con start_new_session).
+    """
+    if proceso.poll() is not None:
+        return
+    if sys.platform == "win32":
+        try:
+            subprocess.run(
+                ["taskkill", "/T", "/F", "/PID", str(proceso.pid)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                timeout=10,
+                check=False,
+            )
+            return
+        except Exception:
+            pass
+    elif hasattr(os, "killpg") and hasattr(os, "getpgid"):
+        try:
+            pgid = os.getpgid(proceso.pid)
+            os.killpg(pgid, signal.SIGTERM)
+            try:
+                proceso.wait(timeout=3)
+                return
+            except subprocess.TimeoutExpired:
+                os.killpg(pgid, signal.SIGKILL)
+                return
+        except ProcessLookupError:
+            return
+        except Exception:
+            pass
+    try:
+        proceso.terminate()
+    except Exception:
+        pass
+
+
 def _cerrar_paso_activo(
     paso_activo: _PasoActivo | None,
     *,
     estado: str,
     mensaje_error: str | None = None,
+    filas_procesadas: int = 0,
+    filas_rechazadas: int = 0,
 ) -> None:
     if paso_activo is None or paso_activo.cerrado or paso_activo.id_paso < 0:
         return
@@ -110,6 +174,8 @@ def _cerrar_paso_activo(
         paso_activo.id_paso,
         estado=estado,
         mensaje_error=mensaje_error,
+        filas_procesadas=filas_procesadas,
+        filas_rechazadas=filas_rechazadas,
     )
     paso_activo.cerrado = True
 
@@ -158,6 +224,7 @@ def ejecutar_corrida(
     comentario: str | None = None,
     timeout_segundos: int = 3600,
     heartbeat_intervalo_seg: int = 30,
+    timeout_arranque_segundos: int = _TIMEOUT_ARRANQUE_SEGUNDOS,
 ) -> EstadoFinal:
     """
     Ejecuta pipeline.py para la corrida dada.
@@ -205,6 +272,9 @@ def ejecutar_corrida(
     )
     r_corrida.insertar_evento(id_corrida, f"[RUNNER] Inicio. PID={pid}", tipo="LOG")
     paso_activo: _PasoActivo | None = None
+    pasos_paralelos: dict[str, _PasoActivo] = {}
+    motivo_timeout: str | None = None
+    _metricas_paso_actual: dict[str, int] = {"filas_procesadas": 0, "filas_rechazadas": 0}
 
     # ── 3. Lanzar subprocess ──────────────────────────────────────────────────
     proceso: subprocess.Popen | None = None
@@ -219,17 +289,26 @@ def ejecutar_corrida(
             extra={"python": python_exe, "script": str(_SCRIPT), "pipeline_args": argumentos_pipeline},
         )
         env = os.environ.copy()
-        env["PYTHONUNBUFFERED"] = "1"  # fuerza flush inmediato de stdout en el pipeline
+        env["PYTHONUNBUFFERED"] = "1"      # fuerza flush inmediato de stdout en el pipeline
+        env["PYTHONIOENCODING"] = "utf-8"  # evita errores de codificación en consola Windows
+        env["PYTHONFAULTHANDLER"] = "1"    # permite diagnóstico si el subproceso se cuelga
+
+        popen_kwargs: dict = {
+            "stdin": subprocess.DEVNULL,
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.STDOUT,
+            "cwd": str(_DIR_ETL),
+            "text": True,
+            "encoding": "utf-8",
+            "errors": "replace",
+            "env": env,
+        }
+        if sys.platform != "win32":
+            popen_kwargs["start_new_session"] = True
 
         proceso = subprocess.Popen(
             [python_exe, "-u", str(_SCRIPT), *argumentos_pipeline],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            cwd=str(_DIR_ETL),
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            env=env,
+            **popen_kwargs,
         )
         log.info(
             "[RUNNER] Subprocess iniciado",
@@ -254,45 +333,75 @@ def ejecutar_corrida(
         hilo_stdout.start()
 
         # ── 4. Leer stdout + heartbeat en thread paralelo ──────────────────────
-        ultimo_heartbeat = time.monotonic()
-        deadline = time.monotonic() + timeout_segundos
+        inicio_subproceso = time.monotonic()
+        ultimo_heartbeat = inicio_subproceso
+        ultimo_check_cancelacion = inicio_subproceso
+        recibio_primer_output = False
+        deadline = inicio_subproceso + timeout_segundos
         timestamp_inicio_paso: datetime | None = None
-        # Métricas recolectadas pero pendientes de persistencia hasta que se aplique
-        # backend/migrations/add_filas_to_corrida_paso.sql (columnas Filas_Procesadas, Filas_Rechazadas).
         _metricas_paso_actual: dict[str, int] = {"filas_procesadas": 0, "filas_rechazadas": 0}
 
         while True:
             ahora = time.monotonic()
 
-            # ── Heartbeat y cancelación — se ejecuta aunque no haya output ──
+            # ── Sondeo rápido de cancelación (cada 5s) ──
+            if ahora - ultimo_check_cancelacion >= min(_POLL_CANCELACION_SEG, heartbeat_intervalo_seg):
+                ultimo_check_cancelacion = ahora
+                if r_corrida.corrida_fue_cancelada(id_corrida):
+                    log.info(
+                        "[RUNNER] Cancelación detectada, terminando árbol de proceso",
+                        extra={"id_corrida": id_corrida},
+                    )
+                    _terminar_arbol_proceso(proceso)
+                    cancelado_por_heartbeat = True
+                    break
+
+            # ── Watchdog de arranque: evita cuelgues silenciosos antes del primer output ──
+            if (
+                not recibio_primer_output
+                and timeout_arranque_segundos > 0
+                and (ahora - inicio_subproceso) > timeout_arranque_segundos
+            ):
+                motivo_timeout = (
+                    f"Pipeline no emitió salida durante los primeros "
+                    f"{timeout_arranque_segundos}s de arranque (posible bloqueo inicial)."
+                )
+                log.error(
+                    "[EJECUTOR] Timeout de arranque sin output (%ds) — abortando corrida",
+                    timeout_arranque_segundos,
+                    extra={"id_corrida": id_corrida},
+                )
+                r_corrida.insertar_evento(id_corrida, f"[TIMEOUT ARRANQUE] {motivo_timeout}", tipo="ERROR")
+                _terminar_arbol_proceso(proceso)
+                estado_final = "TIMEOUT"
+                break
+
+            # ── Heartbeat y timeout por paso — se ejecuta aunque no haya output ──
             if ahora - ultimo_heartbeat >= heartbeat_intervalo_seg:
                 r_corrida.actualizar_heartbeat_corrida(id_corrida, pid)
                 r_lock.actualizar_heartbeat_lock(id_corrida=id_corrida)
                 ultimo_heartbeat = ahora
 
-                if r_corrida.corrida_fue_cancelada(id_corrida):
-                    log.info("[RUNNER] Cancelación detectada, terminando proceso",
-                             extra={"id_corrida": id_corrida})
-                    proceso.terminate()
-                    cancelado_por_heartbeat = True
-                    break
-
                 if timestamp_inicio_paso is not None:
                     seg_en_paso = (datetime.now() - timestamp_inicio_paso).total_seconds()
                     if seg_en_paso > _TIMEOUT_PASO_SEGUNDOS:
+                        motivo_timeout = (
+                            f"Paso activo superó el límite de {_TIMEOUT_PASO_SEGUNDOS}s sin avance."
+                        )
                         log.error(
                             "[EJECUTOR] Paso activo supera timeout (%ds) — abortando corrida",
                             _TIMEOUT_PASO_SEGUNDOS,
                             extra={"id_corrida": id_corrida, "segundos": int(seg_en_paso)},
                         )
-                        proceso.terminate()
+                        _terminar_arbol_proceso(proceso)
                         estado_final = "TIMEOUT"
                         break
 
             if ahora > deadline:
+                motivo_timeout = f"Corrida excedió el timeout global de {timeout_segundos}s."
                 log.warning("[RUNNER] Timeout alcanzado, terminando proceso",
                             extra={"id_corrida": id_corrida})
-                proceso.terminate()
+                _terminar_arbol_proceso(proceso)
                 estado_final = "TIMEOUT"
                 break
 
@@ -302,6 +411,7 @@ def ejecutar_corrida(
                 # Esperamos hasta 1s por la primera línea
                 linea_inicial = cola_stdout.get(timeout=1.0)
                 if linea_inicial is not None:
+                    recibio_primer_output = True
                     lineas.append(linea_inicial)
                     # Drenar el resto de la cola disponible instantáneamente (hasta 500 líneas por ciclo)
                     while len(lineas) < 500:
@@ -330,19 +440,75 @@ def ejecutar_corrida(
                 linea_limpia = _limpiar_color(linea.strip())
                 if not linea_limpia:
                     continue
-                
+
+                evento_estructurado = _parsear_evento_estructurado(linea_limpia)
+                if evento_estructurado is not None:
+                    tipo_ev = str(evento_estructurado.get("tipo", "")).lower()
+                    nombre_fact = str(evento_estructurado.get("fact", "")).strip()
+
+                    if tipo_ev == "fact_inicio" and nombre_fact:
+                        orden_fact = int(evento_estructurado.get("orden") or 100)
+                        pasos_paralelos[nombre_fact] = _abrir_nuevo_paso(
+                            id_corrida,
+                            orden=100 + orden_fact,
+                            nombre_paso=f"Fact: {nombre_fact}"[:100],
+                        )
+                        timestamp_inicio_paso = datetime.now()
+                        eventos_batch.append({
+                            "id_corrida": id_corrida,
+                            "mensaje": f"[FACT INICIO] {nombre_fact}",
+                            "tipo": "PROGRESO",
+                        })
+                        continue
+
+                    if tipo_ev == "fact_fin" and nombre_fact:
+                        estado_raw = str(evento_estructurado.get("estado", "OK")).upper()
+                        estado_paso = "OK" if estado_raw == "OK" else "ERROR"
+                        insertados = int(evento_estructurado.get("insertados") or 0)
+                        rechazados = int(evento_estructurado.get("rechazados") or 0)
+                        duracion_seg = evento_estructurado.get("duracion_seg")
+                        msg_err = evento_estructurado.get("mensaje") or None
+
+                        paso_fact = pasos_paralelos.pop(nombre_fact, None)
+                        _cerrar_paso_activo(
+                            paso_fact,
+                            estado=estado_paso,
+                            mensaje_error=str(msg_err) if estado_paso != "OK" and msg_err else None,
+                            filas_procesadas=insertados,
+                            filas_rechazadas=rechazados,
+                        )
+                        timestamp_inicio_paso = datetime.now()
+                        dur_txt = f" ({duracion_seg}s)" if duracion_seg is not None else ""
+                        resumen_txt = (
+                            f"[FACT {estado_raw}] {nombre_fact}: "
+                            f"{insertados} insertados, {rechazados} rechazados{dur_txt}"
+                        )
+                        if msg_err and estado_paso != "OK":
+                            resumen_txt = f"{resumen_txt} — {msg_err}"
+                        eventos_batch.append({
+                            "id_corrida": id_corrida,
+                            "mensaje": resumen_txt[:4000],
+                            "tipo": "PROGRESO" if estado_paso == "OK" else "ERROR",
+                        })
+                        continue
+
                 # Agregamos a la lista de inserción en batch
                 eventos_batch.append({
                     "id_corrida": id_corrida,
-                    "mensaje": linea_limpia,
-                    "tipo": "LOG"
+                    "mensaje": linea_limpia[:4000],
+                    "tipo": "LOG",
                 })
 
                 inicio_paso = _extraer_inicio_paso(linea_limpia)
                 if inicio_paso is not None:
                     orden_paso, nombre_paso = inicio_paso
-                    _cerrar_paso_activo(paso_activo, estado="OK")
-                    paso_activo = _abrir_nuevo_paso(id_corrida, orden_paso, nombre_paso)
+                    _cerrar_paso_activo(
+                        paso_activo,
+                        estado="OK",
+                        filas_procesadas=_metricas_paso_actual["filas_procesadas"],
+                        filas_rechazadas=_metricas_paso_actual["filas_rechazadas"],
+                    )
+                    paso_activo = _abrir_nuevo_paso(id_corrida, orden_paso, nombre_paso[:100])
                     timestamp_inicio_paso = datetime.now()
                     _metricas_paso_actual = {"filas_procesadas": 0, "filas_rechazadas": 0}
                 else:
@@ -353,6 +519,8 @@ def ejecutar_corrida(
                             _paso_para_cerrar,
                             estado="ERROR",
                             mensaje_error=mensaje_error,
+                            filas_procesadas=_metricas_paso_actual["filas_procesadas"],
+                            filas_rechazadas=_metricas_paso_actual["filas_rechazadas"],
                         )
                     m_met = _RE_METRICAS.search(linea_limpia)
                     if m_met:
@@ -375,7 +543,7 @@ def ejecutar_corrida(
 
     except subprocess.TimeoutExpired:
         if proceso:
-            proceso.kill()
+            _terminar_arbol_proceso(proceso)
         codigo_retorno = -9
         estado_final = "TIMEOUT"
     except Exception as exc:
@@ -401,20 +569,30 @@ def ejecutar_corrida(
     elif estado_final not in ("TIMEOUT",):
         estado_final = "OK" if codigo_retorno == 0 else "ERROR"
 
-    msg_final = (
-        "Pipeline finalizado con éxito."
-        if estado_final == "OK"
-        else f"Pipeline terminó con estado {estado_final}. Código: {codigo_retorno}."
-    )
+    if estado_final == "OK":
+        msg_final = "Pipeline finalizado con éxito."
+    elif motivo_timeout:
+        msg_final = motivo_timeout
+    else:
+        msg_final = f"Pipeline terminó con estado {estado_final}. Código: {codigo_retorno}."
 
     # Evento de cierre
     r_corrida.insertar_evento(id_corrida, f"[FIN] {msg_final}", tipo="FIN")
 
+    estado_paso_cierre = "OK" if estado_final == "OK" else ("OMITIDO" if estado_final == "CANCELADO" else "ERROR")
     _cerrar_paso_activo(
         paso_activo,
-        estado="OK" if estado_final == "OK" else "ERROR",
+        estado=estado_paso_cierre,
         mensaje_error=msg_final if estado_final != "OK" else None,
+        filas_procesadas=_metricas_paso_actual.get("filas_procesadas", 0),
+        filas_rechazadas=_metricas_paso_actual.get("filas_rechazadas", 0),
     )
+    for paso_pendiente in pasos_paralelos.values():
+        _cerrar_paso_activo(
+            paso_pendiente,
+            estado=estado_paso_cierre,
+            mensaje_error=msg_final if estado_final != "OK" else None,
+        )
 
     # Actualizar Control.Corrida
     r_corrida.actualizar_estado_corrida(
@@ -423,12 +601,12 @@ def ejecutar_corrida(
         mensaje_final=msg_final,
     )
 
-    # Actualizar Auditoria.Log_Carga
+    # Actualizar Auditoria.Log_Carga (preserva OK | ERROR | CANCELADO | TIMEOUT)
     if id_log is not None:
         try:
             registrar_fin_corrida(
                 id_log=id_log,
-                estado="OK" if estado_final == "OK" else "ERROR",
+                estado=estado_final,
                 mensaje_error=msg_final if estado_final != "OK" else None,
             )
         except Exception:

@@ -158,6 +158,7 @@ def _ciclo_principal() -> None:
     log.info("[RUNNER] Iniciando. PID=%d", os.getpid())
 
     _limpiar_corridas_huerfanas()
+    errores_poll_consecutivos = 0
 
     while _continuar:
         # Parada suave vía archivo sentinel
@@ -166,7 +167,20 @@ def _ciclo_principal() -> None:
             _STOP_FILE.unlink(missing_ok=True)
             break
 
-        cmd = r_cmd.tomar_comando_pendiente()
+        try:
+            cmd = r_cmd.tomar_comando_pendiente()
+            errores_poll_consecutivos = 0
+        except Exception as exc:
+            errores_poll_consecutivos += 1
+            espera_seg = min(5 * errores_poll_consecutivos, 30)
+            log.warning(
+                "[RUNNER] Error consultando cola de comandos (reintento en %ds)",
+                espera_seg,
+                extra={"error": str(exc), "errores_consecutivos": errores_poll_consecutivos},
+            )
+            time.sleep(espera_seg)
+            continue
+
         if cmd is None:
             time.sleep(_POLL_COLA_COMANDOS_SEG)
             continue

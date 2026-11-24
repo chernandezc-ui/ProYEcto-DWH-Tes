@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from typing import AsyncGenerator
 
 from fastapi import APIRouter, Depends, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
 
@@ -121,7 +122,7 @@ def readiness_control() -> JSONResponse:
 
     return JSONResponse(
         status_code=200 if listo else 503,
-        content={
+        content=jsonable_encoder({
             "servicio": _SERVICIO,
             "version": _VERSION,
             "entorno": settings.entorno,
@@ -129,7 +130,7 @@ def readiness_control() -> JSONResponse:
             "base_datos": _info_bd_publica(info_bd),
             "control_plane": control_plane,
             "timestamp": _timestamp(),
-        },
+        }),
     )
 
 
@@ -160,7 +161,7 @@ def readiness_runner() -> JSONResponse:
 
     return JSONResponse(
         status_code=200 if runner_sano else 503,
-        content={
+        content=jsonable_encoder({
             "servicio": _SERVICIO,
             "version": _VERSION,
             "entorno": settings.entorno,
@@ -168,7 +169,7 @@ def readiness_runner() -> JSONResponse:
             "base_datos": _info_bd_publica(info_bd),
             "control_plane": control_plane,
             "timestamp": _timestamp(),
-        },
+        }),
     )
 
 
@@ -186,7 +187,7 @@ def estado_lock() -> JSONResponse:
     if not bd_lista:
         return JSONResponse(
             status_code=503,
-            content={
+            content=jsonable_encoder({
                 "servicio": _SERVICIO,
                 "version": _VERSION,
                 "entorno": settings.entorno,
@@ -194,14 +195,14 @@ def estado_lock() -> JSONResponse:
                 "base_datos": info_bd,
                 "lock": None,
                 "timestamp": _timestamp(),
-            },
+            }),
         )
 
     try:
         lock = obtener_estado_lock()
         return JSONResponse(
             status_code=200,
-            content={
+            content=jsonable_encoder({
                 "servicio": _SERVICIO,
                 "version": _VERSION,
                 "entorno": settings.entorno,
@@ -209,12 +210,12 @@ def estado_lock() -> JSONResponse:
                 "base_datos": info_bd,
                 "lock": lock,
                 "timestamp": _timestamp(),
-            },
+            }),
         )
     except Exception as exc:
         return JSONResponse(
             status_code=503,
-            content={
+            content=jsonable_encoder({
                 "servicio": _SERVICIO,
                 "version": _VERSION,
                 "entorno": settings.entorno,
@@ -222,7 +223,7 @@ def estado_lock() -> JSONResponse:
                 "base_datos": info_bd,
                 "lock": {"error": str(exc)},
                 "timestamp": _timestamp(),
-            },
+            }),
         )
 
 
@@ -301,7 +302,10 @@ async def stream_telemetria(
     request: Request,
     usuario: UsuarioActual = Depends(obtener_usuario_actual),
 ) -> EventSourceResponse:
-    return EventSourceResponse(_generar_telemetria(request, es_admin=usuario.tiene_rol("admin")))
+    return EventSourceResponse(
+        _generar_telemetria(request, es_admin=usuario.tiene_rol("admin")),
+        ping=20,
+    )
 
 
 # ── GET /health/calidad/stream (SSE) ────────────────────────────────────────────────
@@ -336,4 +340,4 @@ async def _generar_calidad(request: Request) -> AsyncGenerator[dict, None]:
     dependencies=[Depends(require_rol("viewer"))],
 )
 async def stream_calidad(request: Request) -> EventSourceResponse:
-    return EventSourceResponse(_generar_calidad(request))
+    return EventSourceResponse(_generar_calidad(request), ping=20)

@@ -12,6 +12,7 @@ Uso:
 import argparse
 import json
 import sys
+import time
 from datetime import datetime
 
 from sqlalchemy import text
@@ -112,20 +113,38 @@ class JsonLineFormatter(logging.Formatter):
         return json.dumps(payload, ensure_ascii=False, default=str)
 
 
+_PREFIJO_EVENTO_ESTRUCTURADO = "@@ACP_EVENT "
+_STDOUT_EVENT_LOCK = threading.Lock()
+
+
+def _emitir_evento_estructurado(payload: dict) -> None:
+    """Emite una línea JSON estructurada para telemetría concurrente del runner."""
+    linea = _PREFIJO_EVENTO_ESTRUCTURADO + json.dumps(payload, ensure_ascii=False, default=str)
+    with _STDOUT_EVENT_LOCK:
+        print(linea, flush=True)
+
+
 def setup_etl_logger():
+    """Configura solo consola en import para evitar side-effects en --help o tests."""
     logger = logging.getLogger("ETL_Pipeline")
     logger.setLevel(logging.INFO)
-    
-    # Prevenir que agregue multiples handlers si se llama varias veces
+
     if logger.handlers:
         return logger
 
-    # 1. Consola Bonita
     stream_handler = logging.StreamHandler(sys.stdout)
     stream_handler.setFormatter(PrettyConsoleFormatter())
     logger.addHandler(stream_handler)
+    return logger
 
-    # 2. JSON con timestamp para auditoria — preserva historial de runs (O-3)
+
+def activar_log_archivo() -> Path | None:
+    """Adjunta el FileHandler JSON de auditoría al iniciar una ejecución real."""
+    logger = setup_etl_logger()
+    for handler in logger.handlers:
+        if isinstance(handler, logging.FileHandler):
+            return Path(handler.baseFilename)
+
     try:
         log_dir = Path("logs")  # relativo a CWD — ejecutar desde raíz del ETL/
         log_dir.mkdir(exist_ok=True)
@@ -142,16 +161,16 @@ def setup_etl_logger():
                 dest_link.unlink()
             dest_link.symlink_to(ruta_run.name)
         except (OSError, NotImplementedError):
-            # En Windows sin permisos de symlink, copiar el archivo como fallback
             try:
                 import shutil
                 shutil.copy2(str(ruta_run), str(dest_link))
             except Exception:
                 logger.warning("No se pudo crear enlace ni copia de %s → %s", ruta_run, dest_link)
+        return ruta_run
     except Exception as error:
         logger.warning("No se pudo crear file_handler de auditoria: %s", error)
+        return None
 
-    return logger
 
 etl_logger = setup_etl_logger()
 
@@ -159,6 +178,10 @@ def _imprimir(msg: str = ""):
     txt = str(msg).strip()
     if txt and not txt.startswith("=="):
         etl_logger.info(txt)
+        try:
+            sys.stdout.flush()
+        except Exception:
+            pass
 
 
 
@@ -200,7 +223,7 @@ def _validar_tabla(tabla: str) -> None:
         raise ValueError(f"Tabla '{tabla}' no está en el catálogo de facts permitidos.")
 
 
-TOTAL_PASOS_COMPLETO = 14   # pasos que numera ejecutar(); ver llamadas a avanzar()
+TOTAL_PASOS_COMPLETO = 13   # pasos que numera ejecutar(); ver llamadas a avanzar()
 MAX_WORKERS_FACTS = 4       # facts en paralelo (el trabajo real es E/S contra SQL Server)
 
 DEFAULT_CAMA_MIN_PERMITIDA = 0       # mínimo lógico de camas por geografía
@@ -389,34 +412,6 @@ def _ejecutar_sp_sincronizar_campanas(engine) -> None:
         conexion.execute(text("EXEC Silver.sp_Sincronizar_Periodos_Campana"))
 
 
-def _sincronizar_bridges_geografia(engine) -> list[str]:
-    """Ejecuta los SPs de bridges. Cada SP es independiente: si uno falla se
-    sigue con el resto, pero TODAS las fallas se devuelven para que el
-    llamador las reporte (antes se perdían en un print)."""
-    fallas: list[str] = []
-    sps = [
-        "EXEC MDM.usp_Popular_Bridge_Geografia_Campana_Vegetativa;",
-        "EXEC MDM.usp_Popular_Bridge_Geo_Campana_Condicion_Cosecha;",
-        "EXEC MDM.usp_Popular_Bridge_Geografia_Campana_Conteo_Fenologico;",
-        "EXEC MDM.usp_Popular_Bridge_Geografia_Campana_Evaluacion_Pesos;",
-        "EXEC MDM.usp_Popular_Bridge_Geografia_Campana_Censo_Plantas;",
-        "EXEC MDM.usp_Popular_Bridge_Geografia_Campana_Floracion;",
-        "EXEC MDM.usp_Popular_Bridge_Geografia_Campana_Fisiologia;",
-        "EXEC MDM.usp_Popular_Bridge_Geografia_Campana_Tasa_Crecimiento;"
-    ]
-    with engine.connect().execution_options(isolation_level='AUTOCOMMIT') as conexion:
-        for sp in sps:
-            try:
-                conexion.execute(text(sp))
-            except Exception as e:
-                # Un SP fallido no impide ejecutar el resto, pero queda registrado.
-                nombre_sp = sp.replace('EXEC ', '').rstrip(';').strip()
-                descripcion = str(e) or type(e).__name__
-                _imprimir(f'  [ADVERTENCIA] Fallo al ejecutar {nombre_sp}: {descripcion}')
-                fallas.append(f'{nombre_sp}: {descripcion}')
-    return fallas
-
-
 def _obtener_contexto_sql(engine) -> dict:
     with engine.connect() as conexion:
         fila = conexion.execute(text("""
@@ -581,6 +576,14 @@ def _ejecutar_fact(nombre: str, tabla_destino: str, funcion, engine, resumen: di
     id_log = registrar_inicio(tabla_destino, f'PIPELINE_FACT:{nombre}')
     r = {'insertados': 0, 'rechazados': 0, 'cuarentena': []}
     fin_registrado = False
+    inicio_fact = time.perf_counter()
+    orden_fact = int((CATALOGO_FACTS.get(nombre) or {}).get('orden') or 0)
+    _emitir_evento_estructurado({
+        'tipo': 'fact_inicio',
+        'fact': nombre,
+        'tabla_destino': tabla_destino,
+        'orden': orden_fact,
+    })
 
     try:
         r = funcion(engine)
@@ -627,6 +630,18 @@ def _ejecutar_fact(nombre: str, tabla_destino: str, funcion, engine, resumen: di
             'mensaje': '',
         })
         fin_registrado = True
+        _emitir_evento_estructurado({
+            'tipo': 'fact_fin',
+            'fact': nombre,
+            'tabla_destino': tabla_destino,
+            'estado': 'OK',
+            'leidos': r.get('leidos', 0),
+            'insertados': r.get('insertados', 0),
+            'rechazados': r.get('rechazados', 0),
+            'tasa_rechazo_pct': r.get('tasa_rechazo_pct', 0.0),
+            'duracion_seg': round(time.perf_counter() - inicio_fact, 2),
+            'mensaje': '',
+        })
         return None
     except ErrorCircuitBreakerCritico as error:
         # Rechazo >= LIMITE_CRITICO: abortar el pipeline completo, no continuar
@@ -639,6 +654,17 @@ def _ejecutar_fact(nombre: str, tabla_destino: str, funcion, engine, resumen: di
                 'rechazadas': r.get('rechazados', 0),
                 'mensaje': str(error),
             })
+        _emitir_evento_estructurado({
+            'tipo': 'fact_fin',
+            'fact': nombre,
+            'tabla_destino': tabla_destino,
+            'estado': 'CB_CRITICO',
+            'leidos': r.get('leidos', 0),
+            'insertados': r.get('insertados', 0),
+            'rechazados': r.get('rechazados', 0),
+            'duracion_seg': round(time.perf_counter() - inicio_fact, 2),
+            'mensaje': str(error),
+        })
         raise
     except Exception as error:
         # Algunas excepciones (pyodbc, SQLAlchemy) tienen str(error) vacio.
@@ -656,6 +682,17 @@ def _ejecutar_fact(nombre: str, tabla_destino: str, funcion, engine, resumen: di
                 'rechazadas': r.get('rechazados', 0),
                 'mensaje': descripcion,
             })
+        _emitir_evento_estructurado({
+            'tipo': 'fact_fin',
+            'fact': nombre,
+            'tabla_destino': tabla_destino,
+            'estado': 'ERROR',
+            'leidos': r.get('leidos', 0),
+            'insertados': r.get('insertados', 0),
+            'rechazados': r.get('rechazados', 0),
+            'duracion_seg': round(time.perf_counter() - inicio_fact, 2),
+            'mensaje': descripcion,
+        })
         return mensaje_error
 
 
@@ -740,6 +777,7 @@ def ejecutar_reproceso_facts(
     refrescar_gold: bool = True,
     forzar_relectura_bronce: bool = True,
 ) -> None:
+    activar_log_archivo()
     inicio = _encabezado()
     engine = obtener_engine()
     plan = resolver_plan_reproceso(
@@ -847,6 +885,7 @@ def ejecutar_reproceso_facts(
 
 
 def ejecutar() -> None:
+    activar_log_archivo()
     inicio = _encabezado()
     engine = obtener_engine()
     total = TOTAL_PASOS_COMPLETO
@@ -1019,22 +1058,9 @@ def ejecutar() -> None:
     todos_omitidos = all(mart in omitidos for mart in FUNCIONES_MARTS)
 
     if todos_omitidos:
-        avanzar('Sincronizando Bridges de Geografia y Campana... (omitido por errores previos)')
         avanzar('Omitiendo Marts Gold por errores previos...')
         resumen['Gold estado'] = 'OMITIDO_POR_ERROR_EN_FACTS'
     else:
-        avanzar('Sincronizando Bridges de Geografia y Campana...')
-        try:
-            fallas_bridges = _sincronizar_bridges_geografia(engine)
-        except Exception as error:
-            fallas_bridges = [str(error) or type(error).__name__]
-        if fallas_bridges:
-            _imprimir(f'  ERROR sincronizando Bridges: {len(fallas_bridges)} SP(s) fallaron')
-            resumen['Bridges Geografia ERROR'] = ' | '.join(fallas_bridges)
-            errores_pipeline.append(f'Bridges Geografia: {len(fallas_bridges)} SP(s) fallaron')
-        else:
-            resumen['Bridges Geografia'] = 'OK'
-
         if omitidos:
             resumen['Gold marts omitidos'] = ', '.join(sorted(omitidos))
         avanzar('Refrescando Marts Gold...')

@@ -322,22 +322,43 @@ def cerrar_paso(
     filas_procesadas: int = 0,
     filas_rechazadas: int = 0,
 ) -> None:
-    # PENDIENTE MIGRACIÓN: columnas Filas_Procesadas y Filas_Rechazadas aún no existen.
-    # Una vez aplicado backend/migrations/add_filas_to_corrida_paso.sql, reemplazar
-    # este UPDATE con la versión que incluye:
-    #   SET Filas_Procesadas = :filas_proc, Filas_Rechazadas = :filas_rec
+    ahora = datetime.now(tz=timezone.utc)
+    params = {
+        "estado": estado,
+        "ahora": ahora,
+        "err": (mensaje_error or "")[:1000] if mensaje_error else None,
+        "filas_proc": int(filas_procesadas or 0),
+        "filas_rec": int(filas_rechazadas or 0),
+        "id": id_paso,
+    }
     try:
         with obtener_engine().begin() as con:
             con.execute(
                 text("""
                     UPDATE Control.Corrida_Paso
-                    SET Estado = :estado, Fecha_Fin = :ahora, Mensaje_Error = :err
+                    SET Estado = :estado,
+                        Fecha_Fin = :ahora,
+                        Mensaje_Error = :err,
+                        Filas_Procesadas = :filas_proc,
+                        Filas_Rechazadas = :filas_rec
                     WHERE ID_Paso = :id
                 """),
-                {"estado": estado, "ahora": datetime.now(tz=timezone.utc), "err": mensaje_error, "id": id_paso},
+                params,
             )
     except SQLAlchemyError:
-        log.warning("No se pudo cerrar paso", extra={"id_paso": id_paso})
+        # Fallback compatible con entornos sin columnas Filas_Procesadas/Filas_Rechazadas
+        try:
+            with obtener_engine().begin() as con:
+                con.execute(
+                    text("""
+                        UPDATE Control.Corrida_Paso
+                        SET Estado = :estado, Fecha_Fin = :ahora, Mensaje_Error = :err
+                        WHERE ID_Paso = :id
+                    """),
+                    {"estado": estado, "ahora": ahora, "err": params["err"], "id": id_paso},
+                )
+        except SQLAlchemyError:
+            log.warning("No se pudo cerrar paso", extra={"id_paso": id_paso})
 
 def listar_pasos_corrida(id_corrida: str) -> list[dict]:
     try:
@@ -345,14 +366,16 @@ def listar_pasos_corrida(id_corrida: str) -> list[dict]:
             filas = con.execute(
                 text("""
                     SELECT
-                        ID_Paso        AS id_paso,
-                        ID_Corrida     AS id_corrida,
-                        Nombre_Paso    AS nombre_paso,
-                        Orden          AS orden,
-                        Estado         AS estado,
-                        Fecha_Inicio   AS fecha_inicio,
-                        Fecha_Fin      AS fecha_fin,
-                        Mensaje_Error  AS mensaje_error
+                        ID_Paso                        AS id_paso,
+                        ID_Corrida                     AS id_corrida,
+                        Nombre_Paso                    AS nombre_paso,
+                        Orden                          AS orden,
+                        Estado                         AS estado,
+                        Fecha_Inicio                   AS fecha_inicio,
+                        Fecha_Fin                      AS fecha_fin,
+                        Mensaje_Error                  AS mensaje_error,
+                        COALESCE(Filas_Procesadas, 0)  AS filas_procesadas,
+                        COALESCE(Filas_Rechazadas, 0)  AS filas_rechazadas
                     FROM Control.Corrida_Paso
                     WHERE ID_Corrida = :id
                     ORDER BY Orden ASC, ID_Paso ASC
@@ -361,8 +384,32 @@ def listar_pasos_corrida(id_corrida: str) -> list[dict]:
             ).fetchall()
             return [dict(fila._mapping) for fila in filas]
     except SQLAlchemyError:
-        log.exception("Error al listar pasos de corrida", extra={"id_corrida": id_corrida})
-        raise ErrorBaseDatos()
+        try:
+            with obtener_engine().connect() as con:
+                filas = con.execute(
+                    text("""
+                        SELECT
+                            ID_Paso        AS id_paso,
+                            ID_Corrida     AS id_corrida,
+                            Nombre_Paso    AS nombre_paso,
+                            Orden          AS orden,
+                            Estado         AS estado,
+                            Fecha_Inicio   AS fecha_inicio,
+                            Fecha_Fin      AS fecha_fin,
+                            Mensaje_Error  AS mensaje_error
+                        FROM Control.Corrida_Paso
+                        WHERE ID_Corrida = :id
+                        ORDER BY Orden ASC, ID_Paso ASC
+                    """),
+                    {"id": id_corrida},
+                ).fetchall()
+                return [
+                    {**dict(fila._mapping), "filas_procesadas": 0, "filas_rechazadas": 0}
+                    for fila in filas
+                ]
+        except SQLAlchemyError:
+            log.exception("Error al listar pasos de corrida", extra={"id_corrida": id_corrida})
+            raise ErrorBaseDatos()
 
 def solicitar_cancelacion(id_corrida: str, solicitado_por: str) -> bool:
     try:

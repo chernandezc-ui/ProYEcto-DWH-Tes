@@ -48,6 +48,8 @@ class RespuestaPasoCorrida(BaseModel):
     fecha_inicio: datetime | None  = Field(default=None)
     fecha_fin:    datetime | None  = Field(default=None)
     mensaje_error: str | None      = Field(default=None)
+    filas_procesadas: int          = Field(default=0)
+    filas_rechazadas: int          = Field(default=0)
 
     model_config = {"from_attributes": True}
 
