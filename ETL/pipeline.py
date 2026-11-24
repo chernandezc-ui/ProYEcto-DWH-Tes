@@ -580,6 +580,7 @@ def _registrar_errores_resumen(resumen: dict, errores: list[str]) -> None:
 def _ejecutar_fact(nombre: str, tabla_destino: str, funcion, engine, resumen: dict) -> str | None:
     id_log = registrar_inicio(tabla_destino, f'PIPELINE_FACT:{nombre}')
     r = {'insertados': 0, 'rechazados': 0, 'cuarentena': []}
+    fin_registrado = False
 
     try:
         r = funcion(engine)
@@ -613,6 +614,7 @@ def _ejecutar_fact(nombre: str, tabla_destino: str, funcion, engine, resumen: di
                 'rechazadas': r.get('rechazados', 0),
                 'mensaje': mensaje_breaker,
             })
+            fin_registrado = True  # los except de abajo no deben sobrescribirlo
             if nivel_breaker == 'CRITICO':
                 raise ErrorCircuitBreakerCritico(mensaje_breaker)
             raise ErrorCircuitBreakerError(mensaje_breaker)
@@ -624,17 +626,19 @@ def _ejecutar_fact(nombre: str, tabla_destino: str, funcion, engine, resumen: di
             'rechazadas': r.get('rechazados', 0),
             'mensaje': '',
         })
+        fin_registrado = True
         return None
     except ErrorCircuitBreakerCritico as error:
         # Rechazo >= LIMITE_CRITICO: abortar el pipeline completo, no continuar
         _imprimir(f'  CIRCUIT BREAKER CRITICO en {nombre}: {error}')
         resumen[f'{nombre} CIRCUIT_BREAKER'] = str(error)
-        registrar_fin(id_log, {
-            'estado': 'CB_CRITICO',  # Auditoria.Log_Carga.Estado_Proceso VARCHAR(20)
-            'filas': 0,
-            'rechazadas': r.get('rechazados', 0),
-            'mensaje': str(error),
-        })
+        if not fin_registrado:
+            registrar_fin(id_log, {
+                'estado': 'CB_CRITICO',  # Auditoria.Log_Carga.Estado_Proceso VARCHAR(20)
+                'filas': 0,
+                'rechazadas': r.get('rechazados', 0),
+                'mensaje': str(error),
+            })
         raise
     except Exception as error:
         # Algunas excepciones (pyodbc, SQLAlchemy) tienen str(error) vacio.
@@ -645,13 +649,89 @@ def _ejecutar_fact(nombre: str, tabla_destino: str, funcion, engine, resumen: di
         _imprimir(f'  ERROR en {mensaje_error}')
         _imprimir(_tb.format_exc())
         resumen[f'{nombre} ERROR'] = descripcion
-        registrar_fin(id_log, {
-            'estado': 'ERROR',
-            'filas': 0,
-            'rechazadas': r.get('rechazados', 0),
-            'mensaje': descripcion,
-        })
+        if not fin_registrado:
+            registrar_fin(id_log, {
+                'estado': 'ERROR',
+                'filas': 0,
+                'rechazadas': r.get('rechazados', 0),
+                'mensaje': descripcion,
+            })
         return mensaje_error
+
+
+def _ejecutar_facts_en_paralelo(
+    engine,
+    facts: dict,
+    resumen: dict,
+    errores_pipeline: list[str],
+    facts_con_error: list[str],
+    max_workers: int | None = None,
+) -> ErrorCircuitBreakerCritico | None:
+    """
+    Ejecuta facts en un pool de hilos. Devuelve el ErrorCircuitBreakerCritico
+    si alguna lo disparó (None si no).
+
+    Ante un breaker CRITICO se cancelan las facts que aún no empezaron; las que
+    ya corren terminan y confirman su transacción. En ambos casos el resultado
+    de cada hilo (resumen, errores) se conserva: antes la excepción salía del
+    pool sin mezclar nada y los demás hilos seguían cargando sin dejar rastro.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    max_workers = max_workers or MAX_WORKERS_FACTS
+    lock = threading.Lock()
+    breaker_critico: ErrorCircuitBreakerCritico | None = None
+    no_ejecutadas: list[str] = []
+
+    def _ejecutar_fact_paralelo(nombre_f, meta_f):
+        thread_res: dict = {}
+        try:
+            err = _ejecutar_fact(
+                nombre_f, meta_f['tabla_destino'], meta_f['funcion'], engine, thread_res)
+            return nombre_f, err, thread_res, None
+        except ErrorCircuitBreakerCritico as error_cb:
+            return nombre_f, f'{nombre_f}: {error_cb}', thread_res, error_cb
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futuros = {executor.submit(_ejecutar_fact_paralelo, nf, mf): nf for nf, mf in facts.items()}
+        for futuro in as_completed(futuros):
+            nf = futuros[futuro]
+            if futuro.cancelled():
+                no_ejecutadas.append(nf)
+                continue
+            try:
+                _, err, thread_res, critico = futuro.result()
+            except Exception as ex:
+                _imprimir(f"  ERROR crítico en hilo de {nf}: {ex}")
+                errores_pipeline.append(f"{nf}: {ex}")
+                facts_con_error.append(nf)
+                continue
+            with lock:
+                resumen.update(thread_res)
+            if err:
+                errores_pipeline.append(err)
+                facts_con_error.append(nf)
+            if critico is not None and breaker_critico is None:
+                breaker_critico = critico
+                for pendiente in futuros:
+                    pendiente.cancel()
+
+    if no_ejecutadas:
+        resumen['Facts no ejecutadas (breaker critico)'] = ', '.join(sorted(no_ejecutadas))
+    return breaker_critico
+
+
+def _abortar_por_breaker_critico(
+    inicio: datetime,
+    resumen: dict,
+    errores_pipeline: list[str],
+    error: ErrorCircuitBreakerCritico,
+) -> None:
+    """Deja el resumen y los errores acumulados en el log antes de abortar."""
+    resumen['Pipeline abortado'] = 'CIRCUIT_BREAKER_CRITICO'
+    _registrar_errores_resumen(resumen, errores_pipeline)
+    _resumen_final(inicio, resumen)
+    raise error
 
 
 def ejecutar_reproceso_facts(
@@ -904,7 +984,11 @@ def ejecutar() -> None:
         tabla_destino = poda_meta['tabla_destino']
         funcion = poda_meta['funcion']
         avanzar(f'Cargando {nombre} (Secuencial)...')
-        error_fact = _ejecutar_fact(nombre, tabla_destino, funcion, engine, resumen)
+        try:
+            error_fact = _ejecutar_fact(nombre, tabla_destino, funcion, engine, resumen)
+        except ErrorCircuitBreakerCritico as error_cb:
+            errores_pipeline.append(f'{nombre}: {error_cb}')
+            _abortar_por_breaker_critico(inicio, resumen, errores_pipeline, error_cb)
         if error_fact:
             errores_pipeline.append(error_fact)
             facts_con_error.append(nombre)
@@ -923,33 +1007,12 @@ def ejecutar() -> None:
 
     # 3. Ejecutar los hechos restantes en paralelo
     if resto_facts:
-        from concurrent.futures import ThreadPoolExecutor, as_completed
         avanzar(f'Cargando {len(resto_facts)} hechos en paralelo (max_workers={MAX_WORKERS_FACTS})...')
-
-        _resumen_lock = threading.Lock()
-
-        def _ejecutar_fact_paralelo(nombre_f, meta_f):
-            thread_res = {}
-            err = _ejecutar_fact(nombre_f, meta_f['tabla_destino'], meta_f['funcion'], engine, thread_res)
-            return nombre_f, err, thread_res
-
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS_FACTS) as executor:
-            futuros = {executor.submit(_ejecutar_fact_paralelo, nf, mf): nf for nf, mf in resto_facts.items()}
-            for futuro in as_completed(futuros):
-                nf = futuros[futuro]
-                try:
-                    nombre_f, err, thread_res = futuro.result()
-                    with _resumen_lock:
-                        resumen.update(thread_res)
-                    if err:
-                        errores_pipeline.append(err)
-                        facts_con_error.append(nf)
-                except ErrorCircuitBreakerCritico:
-                    raise  # propagar circuit breaker sin atrapar
-                except Exception as ex:
-                    _imprimir(f"  ERROR crítico en hilo de {nf}: {ex}")
-                    errores_pipeline.append(f"{nf}: {ex}")
-                    facts_con_error.append(nf)
+        breaker_critico = _ejecutar_facts_en_paralelo(
+            engine, resto_facts, resumen, errores_pipeline, facts_con_error,
+        )
+        if breaker_critico is not None:
+            _abortar_por_breaker_critico(inicio, resumen, errores_pipeline, breaker_critico)
 
 
     omitidos = _marts_omitidos(facts_con_error, config_operativa['facts_bloqueantes_gold'])

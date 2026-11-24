@@ -855,6 +855,45 @@ class BaseFactProcessor:
                     return val
         return None
 
+    def _rechazar_filas_nulas(
+        self,
+        filas: pd.DataFrame,
+        col_id_origen: str,
+        columna: str,
+        motivo: str,
+        col_valor: str | None = None,
+        tipo_regla: str = 'DQ',
+    ) -> None:
+        """
+        Rechaza filas cuyo dato obligatorio llegó vacío, para que no se pierdan
+        sin rastro: quedan RECHAZADO en Bronce y cuentan en el circuit breaker.
+
+        Si la fila ya tiene un registro en cuarentena (p. ej. variedad que el
+        homologador envió a cuarentena) solo se marca el rechazo, sin crear un
+        segundo registro de cuarentena para el mismo ID.
+        """
+        ids_en_cuarentena = {
+            c.get('id_registro_origen') for c in self.resumen.get('cuarentena', [])
+        }
+        for _, r in filas.iterrows():
+            id_orig = int(r[col_id_origen])
+            valor = r.get(col_valor) if col_valor else None
+            if valor is not None and pd.isna(valor):
+                valor = None
+            if id_orig in ids_en_cuarentena:
+                self.resumen['rechazados'] = self.resumen.get('rechazados', 0) + 1
+                self.resumen['rechazados_ids'].append({
+                    'id': id_orig,
+                    'es_duplicado_externo': False,
+                    'es_duplicado_interno': False,
+                })
+                self.ids_rechazados.append(id_orig)
+            else:
+                self.registrar_rechazo(
+                    id_orig, columna=columna, valor=valor,
+                    motivo=motivo, tipo_regla=tipo_regla,
+                )
+
     def resolver_dimensiones_batch(
         self,
         df: pd.DataFrame,
@@ -887,6 +926,15 @@ class BaseFactProcessor:
             col_id_origen = 'ID_Registro_Origen'
 
         # --- 1. RESOLVER FECHA ---
+        # Las filas sin fecha no entran en el loop de valores únicos (dropna) y
+        # antes se descartaban en silencio al filtrar por ID_Tiempo.
+        nulos_fecha = df_valid[df_valid[col_fecha].isna()]
+        if not nulos_fecha.empty:
+            self._rechazar_filas_nulas(
+                nulos_fecha, col_id_origen,
+                columna=col_fecha, motivo='Fecha vacia',
+            )
+
         raw_fechas = df_valid[col_fecha].dropna().unique()
         mapeo_fechas = {}
         for raw_f in raw_fechas:
@@ -938,6 +986,16 @@ class BaseFactProcessor:
                     mapeo_vars[rv] = None
                 else:
                     mapeo_vars[rv] = id_var
+
+            # Variedad vacía o que el homologador dejó sin canónica (cuarentena):
+            # antes se filtraba en silencio y la fila quedaba CARGADO para siempre.
+            nulos_variedad = df_valid[df_valid[col_var_lookup].isna()]
+            if not nulos_variedad.empty:
+                self._rechazar_filas_nulas(
+                    nulos_variedad, col_id_origen,
+                    columna='Variedad_Raw', motivo='Variedad vacia o sin homologar',
+                    col_valor=col_variedad, tipo_regla='MDM',
+                )
             df_valid['ID_Variedad'] = df_valid[col_var_lookup].map(lambda x: mapeo_vars.get(x))
             df_valid = df_valid[df_valid['ID_Variedad'].notna()]
 
@@ -1071,8 +1129,14 @@ class BaseFactProcessor:
         # esquema enmascarado, o estado de carga mal marcado. Antes esto pasaba
         # inadvertido (caso Tasa_Crecimiento: 418K leidos -> 0 Silver). Se emite
         # ERROR visible y se expone una bandera para el orquestador/auditoria.
+        # Una corrida que solo ACTUALIZA filas existentes (MERGE "último gana")
+        # tiene insertados == 0 sin que haya pérdida: no debe disparar la alerta.
+        actualizados_total = self.resumen.get('actualizados_por_tiebreaker', 0)
         posible_perdida_silenciosa = (
-            total_leidos >= 50 and insertados_total == 0 and unique_ids_rechazados == 0
+            total_leidos >= 50
+            and insertados_total == 0
+            and actualizados_total == 0
+            and unique_ids_rechazados == 0
         )
         if posible_perdida_silenciosa:
             _log.error(
@@ -1093,6 +1157,7 @@ class BaseFactProcessor:
             'Tabla_Destino': self.tabla_destino,
             'Filas_Leidas_Bronce': total_leidos,
             'Filas_Insertadas': self.resumen.get('insertados', 0),
+            'Filas_Actualizadas': actualizados_total,
             'Nuevos_Casos_Cuarentena': unique_ids_rechazados,
             'cuarentena': self.resumen.get('cuarentena', []),
             'Bloqueo_Integridad': breaker.nivel == "WARNING",  # Contrato legado, conservar compatibilidad

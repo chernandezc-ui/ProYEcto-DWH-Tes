@@ -24,7 +24,6 @@ from sqlalchemy.engine import Engine
 from sqlalchemy import text
 
 from utils.contexto_transaccional import ContextoTransaccionalETL
-from utils.fechas import obtener_id_tiempo
 from utils.texto import titulo
 from mdm.homologador import homologar_columna
 from mdm.lookup import obtener_id_cinta, obtener_id_estado_fenologico
@@ -109,16 +108,29 @@ class ProcesadorCiclosFenologicos(BaseFactProcessor):
                         if numeros:
                             primer_num = int(numeros[0])
                             year_campana = primer_num + 2000 if primer_num < 100 else primer_num
-                            if year_campana > 2026: year_campana = 2026
                             fecha_str = f'{year_campana}-01-01'
                 if not fecha_str or str(fecha_str).strip() in ('', 'None', 'nan'):
-                    fecha_str = '2015-01-01'
+                    # Sin fecha derivable: se devuelve None y la fila se rechaza abajo.
+                    # (Antes se fabricaba '2015-01-01', que entraba como un hecho real.)
+                    return None
             return str(fecha_str)
 
         df['_Deriv_Fecha_Temp'] = [
             _get_fecha_ciclo(df.loc[idx, 'Fecha_Raw'], v_raw_df.loc[idx])
             for idx in df.index
         ]
+
+        # Filas sin fecha derivable: rechazo explícito en vez de una fecha inventada.
+        sin_fecha = df['_Deriv_Fecha_Temp'].isna()
+        if sin_fecha.any():
+            self._rechazar_filas_nulas(
+                df[sin_fecha], 'ID_Ciclo_Fenologico',
+                columna='Fecha_Raw', col_valor='Fecha_Raw',
+                motivo='Sin fecha derivable (Fecha, Fecha_detalle, ano+semana o campana)',
+            )
+            df = df[~sin_fecha]
+            if df.empty:
+                return []
 
         # 3. Resolver dimensiones en batch
         df_resolved = self.resolver_dimensiones_batch(
@@ -135,12 +147,19 @@ class ProcesadorCiclosFenologicos(BaseFactProcessor):
         if df_resolved.empty:
             return []
 
-        # 4. Cap de fechas > 2026-06-30
-        mask_cap = df_resolved['Fecha_Evento_dt'] > pd.Timestamp('2026-06-30')
-        if mask_cap.any():
-            df_resolved.loc[mask_cap, 'Fecha_Evento_dt'] = pd.Timestamp('2026-06-30')
-            id_tiempo_capped = obtener_id_tiempo(pd.Timestamp('2026-06-30'))
-            df_resolved.loc[mask_cap, 'ID_Tiempo'] = id_tiempo_capped
+        # 4. Fechas futuras: se rechazan (antes se recortaban a un 2026-06-30 fijo,
+        # lo que falseaba cualquier evaluación posterior a esa fecha).
+        limite_futuro = pd.Timestamp.now().normalize() + pd.Timedelta(days=1)
+        mask_futura = pd.to_datetime(df_resolved['Fecha_Evento_dt']) > limite_futuro
+        if mask_futura.any():
+            self._rechazar_filas_nulas(
+                df_resolved[mask_futura], 'ID_Ciclo_Fenologico',
+                columna='Fecha_Raw', col_valor='_Deriv_Fecha_Temp',
+                motivo='Fecha futura (posterior a hoy)',
+            )
+            df_resolved = df_resolved[~mask_futura]
+            if df_resolved.empty:
+                return []
 
         # 5. Parsear de nuevo Valores_Raw para el subconjunto resuelto
         v_raw_resolved = v_raw_df.loc[df_resolved.index]
@@ -148,7 +167,6 @@ class ProcesadorCiclosFenologicos(BaseFactProcessor):
         payload = []
         for idx, r in df_resolved.iterrows():
             id_origen = int(r['ID_Ciclo_Fenologico'])
-            self.ids_procesados.append(id_origen)
 
             v_r = v_raw_resolved.loc[idx]
 
@@ -160,7 +178,14 @@ class ProcesadorCiclosFenologicos(BaseFactProcessor):
             categoria_raw = titulo(_safe_str(r.get('Etapa_Fenologica_Raw')) or _safe_str(v_r.get('Stage_Raw')) or _safe_str(v_r.get('Categoria_Raw')))
             id_estado = obtener_id_estado_fenologico(categoria_raw, self.engine)
             if id_estado is None:
+                # Antes la fila se marcaba PROCESADO (arriba) y se saltaba sin
+                # insertarse ni dejar rastro. Ahora se rechaza con cuarentena.
+                self.registrar_rechazo(
+                    id_origen, columna='Etapa_Fenologica_Raw', valor=categoria_raw,
+                    motivo='Estado fenologico no reconocido', tipo_regla='MDM',
+                )
                 continue
+            self.ids_procesados.append(id_origen)
 
             id_cinta = obtener_id_cinta(_safe_str(r.get('Color_Raw')), self.engine)
 
